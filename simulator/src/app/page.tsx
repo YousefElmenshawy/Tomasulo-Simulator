@@ -1,65 +1,249 @@
+'use client';
 import Image from "next/image";
 
+
+import { useState } from 'react';
+
 export default function Home() {
+
+
+
+  const [program] = useState([
+    { inst: 'L.D', dest: 'F6', src1: '34', src2: 'R2', issue: null, exec: null, write: null },
+    { inst: 'L.D', dest: 'F2', src1: '45', src2: 'R3', issue: null, exec: null, write: null },
+    { inst: 'MUL.D', dest: 'F0', src1: 'F2', src2: 'F4', issue: null, exec: null, write: null },
+    { inst: 'SUB.D', dest: 'F8', src1: 'F6', src2: 'F2', issue: null, exec: null, write: null },
+    { inst: 'DIV.D', dest: 'F10', src1: 'F0', src2: 'F6', issue: null, exec: null, write: null },
+    { inst: 'ADD.D', dest: 'F6', src1: 'F8', src2: 'F2', issue: null, exec: null, write: null },
+  ]);
+
+  const [reservationStations] = useState({
+    add: [
+      { name: 'Add1', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
+      { name: 'Add2', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
+      { name: 'Add3', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
+    ],
+    mult: [
+      { name: 'Mult1', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
+      { name: 'Mult2', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
+    ],
+    load: [
+      { name: 'Load1', busy: false, op: '', addr: '', dest: '' },
+      { name: 'Load2', busy: false, op: '', addr: '', dest: '' },
+    ],
+  });
+
+  const [registerStatus] = useState({
+    F0: '', F2: '', F4: '', F6: '', F8: '', F10: '', F12: '', F14: '',
+  });
+
+  const [registerFile] = useState({
+    F0: 0, F2: 0, F4: 0, F6: 0, F8: 0, F10: 0, F12: 0, F14: 0,
+  });
+
+  const [memory] = useState({
+    0: 0, 34: 1.5, 45: 2.5, 50: 3.0, 100: 4.2,
+  });
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-black text-gray-100 p-6">
+      {/* Header */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <h1 className="text-4xl font-bold mb-2 text-gray-100">
+          Tomasulo Algorithm Simulator
+        </h1>
+        <p className="text-gray-400">Educational GUI for cycle-by-cycle processor simulation</p>
+      </div>
+
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Instruction Status */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Instruction Status</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Instruction</th>
+                  <th className="text-left p-2 text-gray-400">Dest</th>
+                  <th className="text-left p-2 text-gray-400">Src1</th>
+                  <th className="text-left p-2 text-gray-400">Src2</th>
+                  <th className="text-left p-2 text-gray-400">Issue</th>
+                  <th className="text-left p-2 text-gray-400">Exec</th>
+                  <th className="text-left p-2 text-gray-400">Write</th>
+                </tr>
+              </thead>
+              <tbody>
+                {program.map((inst, idx) => (
+                  <tr key={idx} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                    <td className="p-2 font-mono text-blue-400">{inst.inst}</td>
+                    <td className="p-2">{inst.dest}</td>
+                    <td className="p-2">{inst.src1}</td>
+                    <td className="p-2">{inst.src2}</td>
+                    <td className="p-2">{inst.issue || '-'}</td>
+                    <td className="p-2">{inst.exec || '-'}</td>
+                    <td className="p-2">{inst.write || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Register Status */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Register Status Table</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {Object.entries(registerStatus).map(([reg, station]) => (
+              <div key={reg} className="bg-zinc-800 rounded p-3">
+                <div className="text-xs text-gray-500 mb-1">{reg}</div>
+                <div className="font-mono text-sm text-gray-300">{station || 'Free'}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
+
+        {/* Reservation Stations - Add/Sub */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Add/Sub Reservation Stations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Vj</th>
+                  <th className="text-left p-2 text-gray-400">Vk</th>
+                  <th className="text-left p-2 text-gray-400">Qj</th>
+                  <th className="text-left p-2 text-gray-400">Qk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStations.add.map((rs, idx) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.vj || '-'}</td>
+                    <td className="p-2">{rs.vk || '-'}</td>
+                    <td className="p-2">{rs.qj || '-'}</td>
+                    <td className="p-2">{rs.qk || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Reservation Stations - Mult/Div */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Mult/Div Reservation Stations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Vj</th>
+                  <th className="text-left p-2 text-gray-400">Vk</th>
+                  <th className="text-left p-2 text-gray-400">Qj</th>
+                  <th className="text-left p-2 text-gray-400">Qk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStations.mult.map((rs, idx) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.vj || '-'}</td>
+                    <td className="p-2">{rs.vk || '-'}</td>
+                    <td className="p-2">{rs.qj || '-'}</td>
+                    <td className="p-2">{rs.qk || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Load Buffers */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Load Buffers</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Address</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStations.load.map((rs, idx) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.addr || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Register File */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Register File (Values)</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {Object.entries(registerFile).map(([reg, value]) => (
+              <div key={reg} className="bg-zinc-800 rounded p-3">
+                <div className="text-xs text-gray-500 mb-1">{reg}</div>
+                <div className="font-mono text-sm text-green-400">{value.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Memory */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800 lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Memory</h2>
+          <div className="grid grid-cols-5 gap-3">
+            {Object.entries(memory).map(([addr, value]) => (
+              <div key={addr} className="bg-zinc-800 rounded p-3">
+                <div className="text-xs text-gray-500 mb-1">Mem[{addr}]</div>
+                <div className="font-mono text-sm text-blue-400">{value.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Metrics */}
+      <div className="max-w-7xl mx-auto mt-6 bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+        <h2 className="text-xl font-semibold mb-4 text-gray-200">Performance Metrics</h2>
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-zinc-800 rounded p-4">
+            <div className="text-sm text-gray-500">Total Cycles</div>
+            <div className="text-2xl font-bold text-blue-400">0</div>
+          </div>
+          <div className="bg-zinc-800 rounded p-4">
+            <div className="text-sm text-gray-500">Instructions Completed</div>
+            <div className="text-2xl font-bold text-green-400">0</div>
+          </div>
+          <div className="bg-zinc-800 rounded p-4">
+            <div className="text-sm text-gray-500">IPC</div>
+            <div className="text-2xl font-bold text-purple-400">0.00</div>
+          </div>
+          <div className="bg-zinc-800 rounded p-4">
+            <div className="text-sm text-gray-500">Stalls</div>
+            <div className="text-2xl font-bold text-yellow-400">0</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
