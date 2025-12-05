@@ -49,9 +49,9 @@ private issue(inst: Instruction): void {
     // Check if already issued
     if (inst.issueCycle !== undefined) return;
 
-    // Start tracking issue time if not started
-    if (inst.execCycleStart === undefined) {
-        inst.execCycleStart = Buffers.CycleCounter.value;
+    // Start tracking address computation time for LOAD/STORE
+    if (inst.addressComputeStart === undefined) {
+        inst.addressComputeStart = Buffers.CycleCounter.value;
         
         // Find a free reservation station
         let rs: any;
@@ -59,25 +59,32 @@ private issue(inst: Instruction): void {
             case "ADD":
             case "SUB":
                 rs = this.AddStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 1;
                 break;
             case "NAND":
                 rs = this.NANDStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 2;
                 break;
             case "MUL":
                 rs = this.MultStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 12;
                 break;
             case "LOAD":
                 rs = this.LoadStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 4;
                 break;
             case "STORE":
                 rs = this.StoreStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 4;
                 break;
             case "BEQ":
                 rs = this.BeqStations.find(s => !s.busy);
+                inst.execCyclesNeeded = 1;
                 break;
             case "CALL":
             case "RET":
                 rs = this.CALL_RET_Stations.find(s => !s.busy);
+                inst.execCyclesNeeded = 1;
                 break;
             default:
                 console.error("Unknown opcode:", inst.opcode);
@@ -105,7 +112,7 @@ private issue(inst: Instruction): void {
         
     } else {
         // This is a continuation from a previous cycle (LOAD/STORE address computation)
-        const cyclesPassed = Buffers.CycleCounter.value - inst.execCycleStart;
+        const cyclesPassed = Buffers.CycleCounter.value - (inst.addressComputeStart ?? 0);
         
         if (cyclesPassed < 1) {
             return; // Still computing address, stall
@@ -256,20 +263,130 @@ private issue(inst: Instruction): void {
         this.ReOrderBuffer[robIndex].destReg = `R${inst.rC}`;
     }
 }
-
-private execute(): void
-{
-// To be done
-
-
+private execute(inst: Instruction): void {
+    if (!inst) return;
+    
+  
+    if (inst.execCycleEnd !== undefined) return;  // probably redundant but to be safe
+    
+    // Find the ROB entry for this instruction
+    const robIndex = this.ReOrderBuffer.findIndex(rob => rob.instruction === inst);
+    if (robIndex === -1) return;
+    
+    const robEntry = this.ReOrderBuffer[robIndex];
+    
+    // Find the reservation station for this instruction
+    let rs: any = null;
+    switch (inst.opcode) {
+        case "ADD":
+        case "SUB":
+            rs = this.AddStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "NAND":
+            rs = this.NANDStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "MUL":
+            rs = this.MultStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "LOAD":
+            rs = this.LoadStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "STORE":
+            rs = this.StoreStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "BEQ":
+            rs = this.BeqStations.find(s => s.busy && s.qi === robIndex);
+            break;
+        case "CALL":
+        case "RET":
+            rs = this.CALL_RET_Stations.find(s => s.busy && s.qi === robIndex);
+            break;
+    }
+    
+    if (!rs) return; // RS not found or already freed
+    
+    // Check if operands are ready
+    const operandsReady = (rs.qj === null || rs.qj === undefined) && 
+                          (rs.qk === null || rs.qk === undefined);
+    
+    if (!operandsReady) return; // Wait for operands
+ 
+    
+    // Start execution if not started yet
+    if (inst.execCycleStart === undefined) {
+        inst.execCycleStart = Buffers.CycleCounter.value;
+       
+    }
+    
+    // Check if execution is complete
+    const cyclesElapsed = Buffers.CycleCounter.value - inst.execCycleStart;
+    
+    // Need to execute for execCyclesNeeded cycles
+    if (cyclesElapsed < (inst.execCyclesNeeded ?? 1) - 1) {
+        return; // Still executing, not done yet
+    }
+    
+    // Execution complete! Mark exec end cycle and compute result
+    inst.execCycleEnd = Buffers.CycleCounter.value;
+    
+    // Perform the operation based on opcode
+    let result: number | null = null;
+    
+    switch (inst.opcode) {
+        case "ADD":
+            result = (rs.vj ?? 0) + (rs.vk ?? 0);
+            break;
+            
+        case "SUB":
+            result = (rs.vj ?? 0) - (rs.vk ?? 0);
+            break;
+            
+        case "MUL":
+            result = (rs.vj ?? 0) * (rs.vk ?? 0);
+            break;
+            
+        case "NAND":
+            result = ~((rs.vj ?? 0) & (rs.vk ?? 0));
+            break;
+            
+        case "LOAD":
+            // Load from memory at computed address
+            result = this.Memory[rs.addr] ?? 0;
+            break;
+            
+        case "STORE":
+            // For store, just mark as ready (actual memory write happens at commit)
+            result = rs.vj; 
+            (robEntry as any).addr = rs.addr;
+            break;
+            
+        case "BEQ":
+            // to be implemented
+            break;
+            
+        case "CALL":
+            // Save return address (PC + 4) and jump
+            result = this.PC + 4; // Return address
+            break;
+            
+        case "RET":
+            // Return to address in register
+            result = rs.vj ?? 0;
+            break;
+    }
+    
+    // Store result in ROB and mark as ready
+    if (result !== null) {
+        robEntry.value = result;
+        robEntry.ready = true;
+    }
+    
+    // Free the reservation station (instruction is done executing)
+    rs.busy = false;
 }
 
-private write() : void{
-
-
-
-// To be done
-
+private write(): void {
+    //to be done
 }
 
 private commit (): void{
@@ -296,13 +413,13 @@ step(): void {
         }
         
         // 3. Try to write (executed but not written)
-        else if (inst.execCycle !== undefined && inst.execCycle < Buffers.CycleCounter.value && inst.writeCycle === undefined) {
+        else if (inst.execCycleEnd !== undefined && inst.execCycleEnd < Buffers.CycleCounter.value && inst.writeCycle === undefined) {
             this.write();
         }
         
         // 2. Try to execute (issued but not executed)
-        else if (inst.issueCycle !== undefined && inst.issueCycle < Buffers.CycleCounter.value && inst.execCycle === undefined) {
-            this.execute();
+        else if (inst.issueCycle !== undefined && inst.issueCycle < Buffers.CycleCounter.value && inst.execCycleEnd === undefined) {
+            this.execute(inst);
         }
         
         // 1. Try to issue (either not started OR still computing address)
@@ -323,16 +440,21 @@ step(): void {
 }
 run():void{      // run the whole program
 
+
+    /*
 while (this.Instructions.length>0){
 
 this.step();
 
 
+COMMENTED for now to not destroy anything
+*/
+
 
 }
 
 
-}
+
 
 
 

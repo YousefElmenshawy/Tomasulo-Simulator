@@ -7,11 +7,14 @@ export interface Instruction {
     offset?: number;
     // Timing information for Tomasulo simulation
     issueCycle?: number;
-    execCycle?: number;
+    execCycleStart?: number; // When execution starts
+    execCycleEnd?: number;   // When execution ends
     writeCycle?: number;
+    commitCycle?: number;
 
-    issueCycleStart?: number;
-    execCycleStart?: number; //added these to know whether instruction could switch states yet or not
+    addressComputeStart?: number; // For LOAD/STORE address computation (separate from execution)
+
+    execCyclesNeeded?: number;
 }
 
 export function decodeInst(line:string):Instruction  

@@ -115,7 +115,11 @@ export default function Home() {
       src1,
       src2,
       issue: inst?.issueCycle || null,
-      exec: inst?.execCycle || null,
+      exec: inst?.execCycleStart && inst?.execCycleEnd 
+        ? `${inst.execCycleStart} → ${inst.execCycleEnd}` 
+        : inst?.execCycleStart 
+        ? `${inst.execCycleStart} →` 
+        : null,
       write: inst?.writeCycle || null
     };
   });
@@ -196,18 +200,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-gray-100 p-6">
-      {/* Current Cycle Display - Floating on the right */}
-      <div className="fixed top-25 right-100 z-50">
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800 shadow-2xl">
-          <div className="text-xs text-gray-400 mb-1">Current Cycle</div>
-          <div className="text-4xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
-        </div>
-      </div>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      {/* Reorder Buffer (ROB) - Floating on the left */}
-      <div className="fixed top-25 left-6 z-50 w-96">
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800 shadow-2xl">
-          <h2 className="text-xl font-semibold mb-3 text-gray-200">Reorder Buffer</h2>
+        {/* Reorder Buffer (ROB) */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-3 text-gray-200">ROB</h2>
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-zinc-900">
@@ -235,11 +232,14 @@ export default function Home() {
             </table>
           </div>
         </div>
-      </div>
 
-      
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Current Cycle Display */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-3 text-gray-200">Current Cycle</h2>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-6xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
+          </div>
+        </div>
 
         {/* Instruction Status */}
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
