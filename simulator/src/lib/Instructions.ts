@@ -1,31 +1,3 @@
-export const InstructionFormats = {
-Arithmetic_and_Logic:{
-    
-    ADD:{opcode:0b000 , func:0b0000}, // opcode [15:13], rd [12:10], rs1 [9:7], func [6:3], rs2 [2:0]
-    SUB:{opcode:0b000, func:0b0001  }, // opcode [15:13], rd [12:10], rs1 [9:7], func [6:3], rs2 [2:0]
-    NAND:{opcode:0b001, func:0b0000}, // opcode [15:13], rd [12:10], rs1 [9:7], func [6:3], rs2 [2:0]
-    MUL:{opcode:0b010, func:0b0000} // opcode [15:13], rd [12:10], rs1 [9:7], func [6:3], rs2 [2:0]
-
-},
-CallAndReturn: {
-    CALL:{opcode:0b011},  //opcode [15:13], func [12:7], imm[6:0] (Label) // x1 = PC +1 , jump to imm
-    RET:{opcode:0b100}   //opcode [15:13], func [12:0]  // Jump to address in x1 
-
-},
-LoadAndStore: {
-
-    LOAD:{opcode:0b101}, //opcode [15:13], rd [12:10], rs1 [9:7], imm[6:0]
-    STORE:{opcode:0b110} //opcode [15:13], rs1 (data) [12:10], rs2 [9:7] (address), imm[6:0] (offset)
-
-},
-Branch:{
-
-    BEQ:{opcode:0b111}//opcode [15:13], rs1  [12:10], rs2 [9:7] , imm[6:0] (Jump offset)
-
-
-}
-
-}
 
 export interface Instruction {
     opcode: string;
@@ -43,7 +15,7 @@ export function decodeInst(line:string):Instruction
     const [opcode, rest] = line.split(/\s+(.+)/); // splits at first whitespace
 
     switch (opcode.toUpperCase()) {
-        //  Arithmetic and Logic 
+      
         case "ADD":
         case "SUB":
         case "NAND":
@@ -53,7 +25,7 @@ export function decodeInst(line:string):Instruction
             return { opcode, rA, rB, rC };
         }
 
-        // Load 
+       
         case "LOAD": {
             const match = rest.match(/R(\d+),\s*(-?\d+)\(R(\d+)\)/);
             if (!match) throw new Error(`Invalid LOAD format: ${line}`);
@@ -65,7 +37,7 @@ export function decodeInst(line:string):Instruction
             };
         }
 
-        // Store 
+       
         case "STORE": {
            
             const match = rest.match(/R(\d+),\s*(-?\d+)\(R(\d+)\)/);
@@ -78,7 +50,7 @@ export function decodeInst(line:string):Instruction
             };
         }
 
-        // Branch 
+      
         case "BEQ": {
             
             const [rA, rB, offset] = rest.split(",").map(s => s.trim());
@@ -90,14 +62,14 @@ export function decodeInst(line:string):Instruction
             };
         }
 
-        // Call 
+        
         case "CALL": {
             // assume Label is an offset (atleast for now)
             const imm = parseInt(rest.trim());
             return { opcode, offset: imm };
         }
 
-        //  Return 
+     
         case "RET":
             return { opcode };
 

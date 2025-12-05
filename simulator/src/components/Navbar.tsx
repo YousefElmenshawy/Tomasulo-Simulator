@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ChevronDown, X, Plus } from 'lucide-react';
 
-interface Instruction { // will be changed 
+interface Instruction { // will be changed
   inst: string;
   dest: string;
   src1: string;
@@ -32,11 +32,13 @@ export default function NavBar({ children }:{children:React.ReactNode}) {
   };
 
   const removeInstruction = (index: number) => {
-    
+   setInstructions(instructions.filter((_, i) => i !== index)); 
   };
 
   const updateInstruction = (index: number, field: keyof Instruction, value: string) => {
-   //to be implemented 
+const updated = [...instructions];
+    updated[index][field] = value;
+    setInstructions(updated);
   };
 
   const loadProgram = () => {
