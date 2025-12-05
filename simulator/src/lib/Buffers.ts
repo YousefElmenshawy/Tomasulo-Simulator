@@ -1,3 +1,5 @@
+
+
 // Regsiter File
 export const RF = {
   x0: { name: "x0", value: 0 },
@@ -28,10 +30,10 @@ export const RegistersTable = {
 // Memory
 
 const Memory = new  ArrayBuffer(65536) ; // 64kb
-const MemoryViewer = new Int32Array(Memory).fill(0); // Word Addressable 
+export const MemoryViewer = new Int32Array(Memory).fill(0); // Word Addressable 
 
 
- export const reservationStations = {
+ export let reservationStations = {
     add: [
       { name: 'Add1', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
       { name: 'Add2', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
@@ -51,12 +53,7 @@ export let CycleCount = 0; //Number of Cycles
 export let InstructionCount = 0;  // Number of Instructions
 
 
-export let IQ = { // Instruction Queue to be filled Later
+export let IQ = [{ // Instruction Queue to be filled Later
 
 
-
-
-
-
-
-}
+}]
