@@ -75,10 +75,114 @@ export function allocateROB(inst: Instruction): number {
 
 
 
-export let CycleCount = 0; //Number of Cycles
+// Cycle counter - using an object so it can be modified by reference
+export const CycleCounter = { value: 1 };
+// Export getter for backward compatibility
+export const getCycleCount = () => CycleCounter.value;
 export let InstructionCount = 0;  // Number of Instructions
 
 
 export let IQ:Array<Instruction> = []; // Instruction Queue to be filled Later
+
+// Reset function to clear all state
+export function resetSimulator(): void {
+  // Reset registers
+  RF.forEach(reg => reg.value = 0);
+  
+  // Reset register status table
+  RegistersTable.forEach(reg => reg.ROB = 0);
+  
+  // Reset memory
+  MemoryViewer.fill(0);
+  
+  // Reset reservation stations
+  reservationStations.ADD.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.vk = null;
+    rs.qj = null;
+    rs.qk = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.NAND.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.vk = null;
+    rs.qj = null;
+    rs.qk = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.MULT.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.vk = null;
+    rs.qj = null;
+    rs.qk = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.LOAD.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.qj = null;
+    rs.addr = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.STORE.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.vk = null;
+    rs.qj = null;
+    rs.qk = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.BEQ.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.vj = null;
+    rs.vk = null;
+    rs.qj = null;
+    rs.qk = null;
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  reservationStations.CALL_RET.forEach(rs => {
+    rs.busy = false;
+    rs.op = '';
+    rs.dest = '';
+    rs.qi = null;
+  });
+  
+  // Reset ROB
+  ROB.forEach(entry => {
+    entry.busy = false;
+    entry.instruction = null;
+    entry.destReg = null;
+    entry.value = null;
+    entry.ready = false;
+  });
+  
+  // Reset counters
+  CycleCounter.value = 1;
+  InstructionCount = 0;
+  
+  // Clear instruction queue
+  IQ.length = 0;
+}
 
 

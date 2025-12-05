@@ -5,6 +5,13 @@ export interface Instruction {
     rB?: number;
     rC?: number;
     offset?: number;
+    // Timing information for Tomasulo simulation
+    issueCycle?: number;
+    execCycle?: number;
+    writeCycle?: number;
+
+    issueCycleStart?: number;
+    execCycleStart?: number; //added these to know whether instruction could switch states yet or not
 }
 
 export function decodeInst(line:string):Instruction  
