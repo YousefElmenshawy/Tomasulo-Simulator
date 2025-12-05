@@ -178,14 +178,16 @@ private execute(): void
 
 
 }
-private commit (): void{
+
+private write() : void{
+
 
 
 // To be done
 
 }
-private write() : void{
 
+private commit (): void{
 
 
 // To be done

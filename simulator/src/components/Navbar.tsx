@@ -77,7 +77,7 @@ const updated = [...instructions];
               {/* Run Button */}
               <div className="relative group">
                 <button 
-                  onClick={() => console.log('Run clicked')}
+                  onClick={() => (window as any).simulatorHandlers?.handleRun()}
                   className="p-3 hover:bg-zinc-800 text-green-500 rounded transition-all"
                 >
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -92,7 +92,7 @@ const updated = [...instructions];
               {/* Step Button */}
               <div className="relative group">
                 <button 
-                  onClick={() => console.log('Step clicked')}
+                  onClick={() => (window as any).simulatorHandlers?.handleStep()}
                   className="p-3 hover:bg-zinc-800 text-blue-400 rounded transition-all"
                 >
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -122,7 +122,7 @@ const updated = [...instructions];
               {/* Reset Button */}
               <div className="relative group">
                 <button 
-                  onClick={() => console.log('Reset clicked')}
+                  onClick={() => (window as any).simulatorHandlers?.handleReset()}
                   className="p-3 hover:bg-zinc-800 text-orange-400 rounded transition-all"
                 >
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">

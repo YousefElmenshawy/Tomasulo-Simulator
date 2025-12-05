@@ -2,53 +2,196 @@
 import Image from "next/image";
 // AI prompt(Claude) : Generate the Home page for a tomosulo algorithm Simulator 
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { CPU } from '@/lib/CPU';
+import { 
+  RF, 
+  RegistersTable, 
+  reservationStations, 
+  IQ, 
+  CycleCount, 
+  MemoryViewer, 
+  ROB,
+  InstructionCount
+} from '@/lib/Buffers';
 
 export default function Home() {
+  const [cpu, setCpu] = useState<CPU | null>(null);
+  const [, forceUpdate] = useState(0);
 
+  // Initialize CPU
+  useEffect(() => {
+    const memData: Array<[number, number]> = [
+      [0, 0],
+      [34, 1.5],
+      [45, 2.5],
+      [50, 3.0],
+      [100, 4.2],
+    ];
+    
+    const program = [
+      "LOAD R6, 34(R2)",
+      "LOAD R2, 45(R3)",
+      "MUL R0, R2, R4",
+      "SUB R5, R6, R2",
+      "ADD R6, R4, R2",
+    ];
+    
+    const cpuInstance = new CPU(0, memData, program);
+    setCpu(cpuInstance);
+  }, []);
 
+  const handleStep = () => {
+    if (cpu) {
+      cpu.step();
+      forceUpdate(prev => prev + 1);
+    }
+  };
 
-  const [program] = useState([
-    { inst: 'L.D', dest: 'F6', src1: '34', src2: 'R2', issue: null, exec: null, write: null },
-    { inst: 'L.D', dest: 'F2', src1: '45', src2: 'R3', issue: null, exec: null, write: null },
-    { inst: 'MUL.D', dest: 'F0', src1: 'F2', src2: 'F4', issue: null, exec: null, write: null },
-    { inst: 'SUB.D', dest: 'F8', src1: 'F6', src2: 'F2', issue: null, exec: null, write: null },
-    { inst: 'DIV.D', dest: 'F10', src1: 'F0', src2: 'F6', issue: null, exec: null, write: null },
-    { inst: 'ADD.D', dest: 'F6', src1: 'F8', src2: 'F2', issue: null, exec: null, write: null },
-  ]);
+  const handleRun = () => {
+    if (cpu) {
+      cpu.run();
+      forceUpdate(prev => prev + 1);
+    }
+  };
 
-  const [reservationStations] = useState({
-    add: [
-      { name: 'Add1', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
-      { name: 'Add2', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
-      { name: 'Add3', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
-    ],
-    mult: [
-      { name: 'Mult1', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
-      { name: 'Mult2', busy: false, op: '', vj: '', vk: '', qj: '', qk: '', dest: '' },
-    ],
-    load: [
-      { name: 'Load1', busy: false, op: '', addr: '', dest: '' },
-      { name: 'Load2', busy: false, op: '', addr: '', dest: '' },
-    ],
+  const handleReset = () => {
+    const memData: Array<[number, number]> = [
+      [0, 0],
+      [34, 1.5],
+      [45, 2.5],
+      [50, 3.0],
+      [100, 4.2],
+    ];
+    
+    const program = [
+      "LOAD R6, 34(R2)",
+      "LOAD R2, 45(R3)",
+      "MUL R0, R2, R4",
+      "SUB R2, R6, R2",
+      "ADD R6, R2, R2",
+    ];
+    
+    const cpuInstance = new CPU(0, memData, program);
+    setCpu(cpuInstance);
+    forceUpdate(prev => prev + 1);
+  };
+
+  // Expose handlers to window for Navbar to access
+  useEffect(() => {
+    (window as any).simulatorHandlers = {
+      handleStep,
+      handleRun,
+      handleReset
+    };
+  }, [cpu]);
+
+  // Map IQ to program format for display
+  const program = IQ.slice(0, 6).map((inst, idx) => {
+    if (!inst) return { inst: '-', dest: '-', src1: '-', src2: '-', issue: null, exec: null, write: null };
+    
+    const { opcode, rA, rB, rC, offset } = inst;
+    let instStr = opcode;
+    let dest = '-';
+    let src1 = '-';
+    let src2 = '-';
+    
+    if (opcode === 'LOAD') {
+      instStr = 'L.D';
+      dest = `F${rA}`;
+      src1 = offset?.toString() || '-';
+      src2 = `R${rB}`;
+    } else if (opcode === 'STORE') {
+      instStr = 'S.D';
+      dest = `F${rA}`;
+      src1 = offset?.toString() || '-';
+      src2 = `R${rB}`;
+    } else if (opcode === 'MUL') {
+      instStr = 'MUL.D';
+      dest = `F${rC}`;
+      src1 = `F${rA}`;
+      src2 = `F${rB}`;
+    } else if (opcode === 'ADD') {
+      instStr = 'ADD.D';
+      dest = `F${rC}`;
+      src1 = `F${rA}`;
+      src2 = `F${rB}`;
+    } else if (opcode === 'SUB') {
+      instStr = 'SUB.D';
+      dest = `F${rC}`;
+      src1 = `F${rA}`;
+      src2 = `F${rB}`;
+    }
+    
+    return { inst: instStr, dest, src1, src2, issue: null, exec: null, write: null };
   });
 
-  const [registerStatus] = useState({
-    F0: '', F2: '', F4: '', F6: '', F8: '', F10: '', F12: '', F14: '',
-  });
+  // Map reservation stations to the format expected by UI
+  const reservationStationsUI = {
+    add: reservationStations.ADD.map((rs, idx) => ({
+      name: `Add${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      vj: rs.vj?.toString() || '',
+      vk: rs.vk?.toString() || '',
+      qj: rs.qj?.toString() || '',
+      qk: rs.qk?.toString() || '',
+      dest: ''
+    })),
+    mult: reservationStations.MULT.map((rs, idx) => ({
+      name: `Mult${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      vj: rs.vj?.toString() || '',
+      vk: rs.vk?.toString() || '',
+      qj: rs.qj?.toString() || '',
+      qk: rs.qk?.toString() || '',
+      dest: ''
+    })),
+    load: reservationStations.LOAD.map((rs, idx) => ({
+      name: `Load${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      addr: rs.addr?.toString() || '',
+      dest: ''
+    })),
+  };
 
-  const [registerFile] = useState({
-    F0: 0, F2: 0, F4: 0, F6: 0, F8: 0, F10: 0, F12: 0, F14: 0,
-  });
+  // Map register status to R0-R7 format
+  const registerStatus = {
+    R0: RegistersTable[0]?.ROB ? `ROB${RegistersTable[0].ROB}` : '',
+    R1: RegistersTable[1]?.ROB ? `ROB${RegistersTable[1].ROB}` : '',
+    R2: RegistersTable[2]?.ROB ? `ROB${RegistersTable[2].ROB}` : '',
+    R3: RegistersTable[3]?.ROB ? `ROB${RegistersTable[3].ROB}` : '',
+    R4: RegistersTable[4]?.ROB ? `ROB${RegistersTable[4].ROB}` : '',
+    R5: RegistersTable[5]?.ROB ? `ROB${RegistersTable[5].ROB}` : '',
+    R6: RegistersTable[6]?.ROB ? `ROB${RegistersTable[6].ROB}` : '',
+    R7: RegistersTable[7]?.ROB ? `ROB${RegistersTable[7].ROB}` : '',
+  };
 
-  const [memory] = useState({
-    0: 0, 34: 1.5, 45: 2.5, 50: 3.0, 100: 4.2,
-  });
+  // Map register file values
+  const registerFile = {
+    R0: RF[0]?.value || 0,
+    R1: RF[1]?.value || 0,
+    R2: RF[2]?.value || 0,
+    R3: RF[3]?.value || 0,
+    R4: RF[4]?.value || 0,
+    R5: RF[5]?.value || 0,
+    R6: RF[6]?.value || 0,
+    R7: RF[7]?.value || 0,
+  };
+
+  // Map memory values
+  const memory: Record<number, number> = {
+    0: MemoryViewer[0],
+    34: MemoryViewer[34],
+    45: MemoryViewer[45],
+    50: MemoryViewer[50],
+    100: MemoryViewer[100],
+  };
 
   return (
     <div className="min-h-screen bg-black text-gray-100 p-6">
-    
-
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Instruction Status */}
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
@@ -113,7 +256,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {reservationStations.add.map((rs, idx) => (
+                {reservationStationsUI.add.map((rs: any, idx: number) => (
                   <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
                     <td className="p-2 font-mono">{rs.name}</td>
                     <td className="p-2">{rs.busy ? '✓' : '-'}</td>
@@ -146,7 +289,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {reservationStations.mult.map((rs, idx) => (
+                {reservationStationsUI.mult.map((rs: any, idx: number) => (
                   <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
                     <td className="p-2 font-mono">{rs.name}</td>
                     <td className="p-2">{rs.busy ? '✓' : '-'}</td>
@@ -176,7 +319,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {reservationStations.load.map((rs, idx) => (
+                {reservationStationsUI.load.map((rs: any, idx: number) => (
                   <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
                     <td className="p-2 font-mono">{rs.name}</td>
                     <td className="p-2">{rs.busy ? '✓' : '-'}</td>
