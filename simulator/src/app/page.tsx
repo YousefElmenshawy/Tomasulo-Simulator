@@ -47,13 +47,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-gray-100 p-6">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <h1 className="text-4xl font-bold mb-2 text-gray-100">
-          Tomasulo Algorithm Simulator
-        </h1>
-        <p className="text-gray-400">Educational GUI for cycle-by-cycle processor simulation</p>
-      </div>
+    
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Instruction Status */}
