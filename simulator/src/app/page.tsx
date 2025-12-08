@@ -26,6 +26,7 @@ export default function Home() {
     "LOAD R2, 45(R3)",
     "MUL R0, R2, R4",
     "SUB R5, R6, R2",
+    "ADD R7, R0, R2",
     "ADD R6, R4, R2",
   ]);
 
@@ -120,7 +121,14 @@ export default function Home() {
         : inst?.execCycleStart 
         ? `${inst.execCycleStart} →` 
         : null,
-      write: inst?.writeCycle || null
+      write: inst?.writeCycle || null,
+      commit: inst?.commitCycleStart && inst?.commitCyclesEnd 
+        ? (inst.commitCycleStart === inst.commitCyclesEnd 
+            ? `${inst.commitCycleStart}` 
+            : `${inst.commitCycleStart} → ${inst.commitCyclesEnd}`)
+        : inst?.commitCycleStart 
+        ? `${inst.commitCycleStart} →` 
+        : null
     };
   });
 
@@ -146,11 +154,47 @@ export default function Home() {
       qk: rs.qk?.toString() || '',
       dest: ''
     })),
+    nand: reservationStations.NAND.map((rs, idx) => ({
+      name: `NAND${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      vj: rs.vj?.toString() || '',
+      vk: rs.vk?.toString() || '',
+      qj: rs.qj?.toString() || '',
+      qk: rs.qk?.toString() || '',
+      dest: ''
+    })),
     load: reservationStations.LOAD.map((rs, idx) => ({
       name: `Load${idx + 1}`,
       busy: rs.busy,
       op: rs.op || '',
       addr: rs.addr?.toString() || '',
+      dest: ''
+    })),
+    store: reservationStations.STORE.map((rs, idx) => ({
+      name: `Store${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      vj: rs.vj?.toString() || '',
+      vk: rs.vk?.toString() || '',
+      qj: rs.qj?.toString() || '',
+      qk: rs.qk?.toString() || '',
+      dest: ''
+    })),
+    beq: reservationStations.BEQ.map((rs, idx) => ({
+      name: `BEQ${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
+      vj: rs.vj?.toString() || '',
+      vk: rs.vk?.toString() || '',
+      qj: rs.qj?.toString() || '',
+      qk: rs.qk?.toString() || '',
+      dest: ''
+    })),
+    callRet: reservationStations.CALL_RET.map((rs, idx) => ({
+      name: `Call/Ret${idx + 1}`,
+      busy: rs.busy,
+      op: rs.op || '',
       dest: ''
     })),
   };
@@ -179,15 +223,28 @@ export default function Home() {
     R7: RF[7]?.value || 0,
   };
 
-  // Map ROB entries for display
-  const robEntries = ROB.map((entry, idx) => ({
-    index: idx,
-    busy: entry.busy,
-    instruction: entry.instruction?.opcode || '-',
-    destReg: entry.destReg || '-',
-    value: entry.value !== null ? entry.value.toString() : '-',
-    ready: entry.ready
-  }));
+  // Map ROB entries for display - always show 8 entries
+  const robEntries = Array.from({ length: 8 }, (_, idx) => {
+    const entry = ROB[idx];
+    if (entry) {
+      return {
+        index: idx,
+        busy: entry.busy,
+        instruction: entry.instruction?.opcode || '-',
+        destReg: entry.destReg || '-',
+        value: entry.value !== null ? entry.value.toString() : '-',
+        ready: entry.ready
+      };
+    }
+    return {
+      index: idx,
+      busy: false,
+      instruction: '-',
+      destReg: '-',
+      value: '-',
+      ready: false
+    };
+  });
 
   // Map memory values
   const memory: Record<number, number> = {
@@ -231,7 +288,9 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+          
         </div>
+
 
         {/* Current Cycle Display */}
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
@@ -255,6 +314,7 @@ export default function Home() {
                   <th className="text-left p-2 text-gray-400">Issue</th>
                   <th className="text-left p-2 text-gray-400">Exec</th>
                   <th className="text-left p-2 text-gray-400">Write</th>
+                  <th className="text-left p-2 text-gray-400">Commit</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,6 +327,7 @@ export default function Home() {
                     <td className="p-2">{inst.issue || '-'}</td>
                     <td className="p-2">{inst.exec || '-'}</td>
                     <td className="p-2">{inst.write || '-'}</td>
+                    <td className="p-2">{inst.commit || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -373,6 +434,132 @@ export default function Home() {
                     <td className="p-2">{rs.busy ? '✓' : '-'}</td>
                     <td className="p-2">{rs.op || '-'}</td>
                     <td className="p-2">{rs.addr || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Store Buffers */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">Store Buffers</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Vj</th>
+                  <th className="text-left p-2 text-gray-400">Vk</th>
+                  <th className="text-left p-2 text-gray-400">Qj</th>
+                  <th className="text-left p-2 text-gray-400">Qk</th>
+                  <th className="text-left p-2 text-gray-400">Addr</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStationsUI.store.map((rs: any, idx: number) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.vj || '-'}</td>
+                    <td className="p-2">{rs.vk || '-'}</td>
+                    <td className="p-2">{rs.qj || '-'}</td>
+                    <td className="p-2">{rs.qk || '-'}</td>
+                    <td className="p-2">{rs.addr || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* NAND Reservation Stations */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">NAND Reservation Stations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Vj</th>
+                  <th className="text-left p-2 text-gray-400">Vk</th>
+                  <th className="text-left p-2 text-gray-400">Qj</th>
+                  <th className="text-left p-2 text-gray-400">Qk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStationsUI.nand.map((rs: any, idx: number) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.vj || '-'}</td>
+                    <td className="p-2">{rs.vk || '-'}</td>
+                    <td className="p-2">{rs.qj || '-'}</td>
+                    <td className="p-2">{rs.qk || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* BEQ Reservation Stations */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">BEQ Reservation Stations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                  <th className="text-left p-2 text-gray-400">Vj</th>
+                  <th className="text-left p-2 text-gray-400">Vk</th>
+                  <th className="text-left p-2 text-gray-400">Qj</th>
+                  <th className="text-left p-2 text-gray-400">Qk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStationsUI.beq.map((rs: any, idx: number) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
+                    <td className="p-2">{rs.vj || '-'}</td>
+                    <td className="p-2">{rs.vk || '-'}</td>
+                    <td className="p-2">{rs.qj || '-'}</td>
+                    <td className="p-2">{rs.qk || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* CALL/RET Reservation Stations */}
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-gray-200">CALL/RET Reservation Stations</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-700">
+                  <th className="text-left p-2 text-gray-400">Name</th>
+                  <th className="text-left p-2 text-gray-400">Busy</th>
+                  <th className="text-left p-2 text-gray-400">Op</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationStationsUI.callRet.map((rs: any, idx: number) => (
+                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                    <td className="p-2 font-mono">{rs.name}</td>
+                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                    <td className="p-2">{rs.op || '-'}</td>
                   </tr>
                 ))}
               </tbody>

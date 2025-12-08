@@ -1,4 +1,4 @@
-import {RF,RegistersTable,reservationStations,IQ,InstructionCount,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter}from "./Buffers"
+import {RF,RegistersTable,reservationStations,IQ,InstructionCount,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter, CMDB, enqueueCDB, dequeueCDB}from "./Buffers"
 import { Instruction,decodeInst } from "./Instructions";
 
 
@@ -6,7 +6,7 @@ import { Instruction,decodeInst } from "./Instructions";
 export class CPU
 {
 private  PC:number = 0;
-private Memory:Int32Array = MemoryViewer;   //Note to Kareem : that this is a reference not a copy so Buffers in Buffers.ts changes when CPU Buffers change.
+private Memory:Int32Array = MemoryViewer; 
 private Registers = RF;
 private RegTable = RegistersTable;
 private AddStations = reservationStations.ADD; 
@@ -17,8 +17,9 @@ private CALL_RET_Stations =reservationStations.CALL_RET;
 private StoreStations = reservationStations.STORE; 
 private BeqStations = reservationStations.BEQ; 
 private Instructions = IQ;
-private NumCycles = CycleCounter ;   // No need for getters just use the object 
+private NumCycles = CycleCounter ;  
 private ReOrderBuffer = ROB;
+private CommonDataBus = CMDB;
 
 constructor(InstAddress:number ,Memdata: Array<[number,number]>, program: Array<string> ){ // Inputs DataMemory and Starting Address
 
@@ -377,10 +378,31 @@ private execute(inst: Instruction): void {
     if (!rs) return; // RS not found or already freed
     
     // Check if operands are ready
-    const operandsReady = (rs.qj === null || rs.qj === undefined) && 
-                          (rs.qk === null || rs.qk === undefined);
+
+
+    const InROB = (robTag: number | null): boolean => { //helper func to ease next part
+    if (robTag === null || robTag === undefined) return false;
     
-    if (!operandsReady) return; // Wait for operands
+    const robEntryN = this.ReOrderBuffer[robTag];
+    return robEntryN && robEntryN.ready === true;  //to differentiate between robEntry
+}
+
+
+    const operandsReady = (rs.qj === null || rs.qj === undefined || InROB(rs.qj)) && 
+                      (rs.qk === null || rs.qk === undefined || InROB(rs.qk));
+
+if (!operandsReady) return; // Wait for operands
+
+// If we reach here, update values from ROB if needed
+if (rs.qj !== null && rs.qj !== undefined && InROB(rs.qj)) {
+    rs.vj = this.ReOrderBuffer[rs.qj].value ?? 0;
+    rs.qj = null;
+}
+
+if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
+    rs.vk = this.ReOrderBuffer[rs.qk].value ?? 0;
+    rs.qk = null;
+}
  
     
     // Start execution if not started yet
@@ -393,43 +415,47 @@ private execute(inst: Instruction): void {
     const cyclesElapsed = CycleCounter.value - inst.execCycleStart;
     
     
-    // Execution complete! Mark exec end cycle and compute result
-    inst.execCycleEnd = CycleCounter.value;
+   
     
     // Perform the operation based on opcode
     let result: number | null = null;
     
     switch (inst.opcode) {
         case "ADD":
-            if(cyclesElapsed===1)
+            if(cyclesElapsed===2){
                 result = (rs.vj ?? 0) + (rs.vk ?? 0);
+                inst.execCycleEnd = CycleCounter.value;}
             else
                 return;
             break;
             
         case "SUB":
-            if(cyclesElapsed===1)
+            if(cyclesElapsed===1){
                 result = (rs.vj ?? 0) - (rs.vk ?? 0);
+                inst.execCycleEnd = CycleCounter.value;}
             else
                 return;
             break;
             
         case "MUL":
-            if(cyclesElapsed===11)
+            if(cyclesElapsed===11){
                 result = (rs.vj ?? 0) * (rs.vk ?? 0);
+                inst.execCycleEnd = CycleCounter.value;
+            }
             else
                 return;
             break;
             
-        case "NAND":
+        case "NAND": 
             result = ~((rs.vj ?? 0) & (rs.vk ?? 0));
+            inst.execCycleEnd = CycleCounter.value;
             break;
             
         case "LOAD":
             // LOAD: 2 cycles to compute address, then 4 cycles to read from memory (total 6)
             
             // After 2 cycles (cyclesElapsed == 1), compute effective address
-            if (cyclesElapsed === 1) {
+            if (cyclesElapsed === 1 ) {
                 const effectiveAddr = (rs.vj ?? 0) + (rs.addr ?? 0);
                 robEntry.addr = effectiveAddr;  // Store for UI to display
                 return; // Not done yet, continue execution
@@ -439,6 +465,7 @@ private execute(inst: Instruction): void {
             if (cyclesElapsed === 5) {
                 const loadAddr = robEntry.addr;  // Use computed address
                 result = this.Memory[loadAddr] ?? 0;
+                inst.execCycleEnd = CycleCounter.value;
             } else {
                 return; // Not done yet, don't mark as ready
             }
@@ -452,6 +479,7 @@ private execute(inst: Instruction): void {
                 const effectiveAddr = (rs.vk ?? 0) + (rs.addr ?? 0);
                 robEntry.addr = effectiveAddr;  // Store for UI to display
                  result = rs.vj;
+                 inst.execCycleEnd = CycleCounter.value;
             }
             else {
                 return; // Not done yet, don't mark as ready
@@ -473,6 +501,7 @@ private execute(inst: Instruction): void {
             result = equal ? 1 : 0;
             robEntry.BranchTaken = equal;
             robEntry.targetPC = targetPC;
+            inst.execCycleEnd = CycleCounter.value;
             break;
             
         case "CALL":
@@ -482,26 +511,45 @@ private execute(inst: Instruction): void {
             // Calculate call target address from offset
             const callTarget = this.PC + rs.addr; // PC + label offset
             robEntry.targetPC = callTarget; // Store target for commit
+            inst.execCycleEnd = CycleCounter.value;
             break;
             
         case "RET":
             // Return to address in register
             result = rs.vj ?? 0;
+            inst.execCycleEnd = CycleCounter.value;
             break;
     }
     
-    // Store result in ROB and mark as ready
+    // Store result in CMDB
     if (result !== null) {
-        robEntry.value = result;
-        robEntry.ready = true;
+        enqueueCDB(robIndex, result);  //enque to check later if this inst has priority
+        rs.busy = false; // Free RS after execution completes
     }
-    
-    // Free the reservation station (instruction is done executing)
-    rs.busy = false;
 }
 
 private write(): void {
-    //to be done
+
+    // Dequeue one entry from CMDB (process first in queue)
+    const cdbEntry = dequeueCDB();
+    if (!cdbEntry) return; // Queue is empty
+    
+    const { robIndex, value } = cdbEntry;
+    const robEntry = this.ReOrderBuffer[robIndex];
+    if (!robEntry) return;
+
+    robEntry.value = value;
+    robEntry.ready = true;
+
+    const inst = robEntry.instruction;
+    if (!inst) return;
+
+    if(inst.execCycleEnd === undefined) return;
+    
+    inst.writeCycle = CycleCounter.value;
+
+
+    
 }
 
 private commit(): void {
@@ -648,6 +696,9 @@ private commit(): void {
             }
             this.ReOrderBuffer.splice(1); //remove all flushed Entries of ROB
 
+            // Clear CMDB queue since all flushed instructions
+            this.CommonDataBus.length = 0;
+
         }
         // If not taken, PC already correct (incremented normally)
     }
@@ -688,71 +739,126 @@ private commit(): void {
     // Remove from ROB
     this.ReOrderBuffer.shift(); //note: shift() removes and return the first element in the array
    
+     //Update all ROB indices in reservation stations and register table
+    //After shift, all indices decrease by 1
+    
+    // Update reservation stations
+    this.AddStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+        if (rs.qk !== null && rs.qk > 0) rs.qk--;
+    });
+    
+    this.MultStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+        if (rs.qk !== null && rs.qk > 0) rs.qk--;
+    });
+    
+    this.NANDStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+        if (rs.qk !== null && rs.qk > 0) rs.qk--;
+    });
+    
+    this.LoadStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+    });
+    
+    this.StoreStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+        if (rs.qk !== null && rs.qk > 0) rs.qk--;
+    });
+    
+    this.BeqStations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        if (rs.qj !== null && rs.qj > 0) rs.qj--;
+        if (rs.qk !== null && rs.qk > 0) rs.qk--;
+    });
+    
+    this.CALL_RET_Stations.forEach(rs => {
+        if (rs.qi !== null && rs.qi > 0) rs.qi--;
+        
+    });
+    
+    // Update register table
+    this.RegTable.forEach(reg => {
+        if (reg.ROB > 0) reg.ROB--;
+    });
+
+    // Update CMDB queue - decrement all ROB indices
+    this.CommonDataBus.forEach(entry => {
+        if (entry.robIndex > 0) entry.robIndex--;
+    });
+
+    // Remove the committed instruction from the Instructions array
+    //removed for now bc uses ui issues
+
+    /*
+    const instIndex = this.Instructions.indexOf(inst);
+    if (instIndex !== -1) {
+        this.Instructions.splice(instIndex, 1);
+    }
+
+    */
+    
 }
 
 step(): void {
-    // One cycle 
-    // Order: Issue -> Execute -> Write -> Commit 
+    // One cycle - process all instructions in proper order
+    // Order: Commit -> Write -> Execute -> Issue (reverse pipeline order)
     
-    //  ISSUE 
+    // 1. COMMIT - Try to commit the head of ROB (in-order)
+    const headROB = this.ReOrderBuffer[0];
+    if (headROB && headROB.ready) {
+        const headInst = headROB.instruction;
+        if (headInst && headInst.execCycleEnd !== undefined && headInst.commitCyclesEnd === undefined) {
+            this.commit();
+        }
+    }
+    
+    // 2. WRITE - Broadcast results on CDB
+    this.write();
+    
+    // 3. EXECUTE - All issued instructions that haven't finished execution
+    for (let i = 0; i < this.Instructions.length; i++) {
+        const inst = this.Instructions[i];
+        if (!inst) continue;
+        
+        // Execute if issued in a previous cycle and not yet finished
+        if (inst.issueCycle !== undefined && 
+            inst.issueCycle < CycleCounter.value && 
+            inst.execCycleEnd === undefined) {
+            this.execute(inst);
+            
+            
+        }
+    }
+    
+    // 4. ISSUE - Issue the instruction at PC (if not already issued)
     const currentInst = this.Instructions[Math.floor(this.PC)];
-    if (currentInst) {
+    if (currentInst && currentInst.issueCycle === undefined) {
         this.issue(currentInst);
     }
     
-    
-    //EXECUTE - All issued instructions that haven't finished execution
-    for (let i = 0; i < this.Instructions.length; i++) {
-        const inst = this.Instructions[i];
-        if (!inst) continue;
-        
-        // If issued but not finished execution
-        if (inst.issueCycle !== undefined && inst.execCycleEnd === undefined) {
-            this.execute(inst);
-        }
-       
-    }
-    
- 
-    this.write();
-
-    for (let i = 0; i < this.Instructions.length; i++) {
-        const inst = this.Instructions[i];
-        if (!inst) continue;
-        
-        // If Executed  but not finished Commiting
-        if(inst.execCycleEnd !== undefined && inst.commitCyclesEnd=== undefined)
-            this.commit();
-    }
-     
-    
     CycleCounter.value++;
 }
+
+
 run():void{      // run the whole program
 
 
-    /*
+    
 while (this.Instructions.length>0){
 
 this.step();
-
-
-COMMENTED for now to not destroy anything
-*/
+CycleCounter.value++;
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
+}
+
+

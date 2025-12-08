@@ -91,6 +91,22 @@ export function allocateROB(inst: Instruction): number {
 
 // Cycle counter - using an object so it can be modified by reference
 export const CycleCounter = { value: 1 };
+
+// Common Data Bus
+export const CMDB: Array<{ robIndex: number; value: number }> = []; //has to be queue to store (as if result saved in executing)
+
+export function enqueueCDB(robIndex: number, value: number): void {
+    CMDB.push({ robIndex, value });
+}
+
+export function dequeueCDB(): { robIndex: number; value: number } | null {
+    return CMDB.shift() || null;
+}
+
+export function clearCDB(): void {  //for reset
+    CMDB.length = 0;
+}
+
 // Export getter for backward compatibility
 export const getCycleCount = () => CycleCounter.value;
 export let InstructionCount = 0;  // Number of Instructions
@@ -109,99 +125,39 @@ export function resetSimulator(): void {
   // Reset memory
   MemoryViewer.fill(0);
   
-  // Reset reservation stations
-  reservationStations.ADD.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.vk = null;
-    rs.qj = null;
-    rs.qk = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
+  // Recreate reservation stations from scratch
+  reservationStations = {
+    ADD: Array(4).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
+    NAND: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
+    MULT: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
+    LOAD: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
+    STORE: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
+    BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
+    CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', dest: '', qi: null as number | null }))
+  };
   
-  reservationStations.NAND.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.vk = null;
-    rs.qj = null;
-    rs.qk = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  reservationStations.MULT.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.vk = null;
-    rs.qj = null;
-    rs.qk = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  reservationStations.LOAD.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.qj = null;
-    rs.addr = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  reservationStations.STORE.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.vk = null;
-    rs.qj = null;
-    rs.qk = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  reservationStations.BEQ.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.vj = null;
-    rs.vk = null;
-    rs.qj = null;
-    rs.qk = null;
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  reservationStations.CALL_RET.forEach(rs => {
-    rs.busy = false;
-    rs.op = '';
-    rs.dest = '';
-    rs.qi = null;
-  });
-  
-  // Reset ROB
-  ROB.forEach(entry => {
-    entry.busy = false;
-    entry.instruction = null;
-    entry.destReg = null;
-    entry.value = null;
-    entry.ready = false;
-    entry.BranchPC = 0;
-    entry.addr = 0;
-    entry.BranchPC=0;
-    entry.targetPC=0;
-    entry.BranchTaken = false;
-  });
+  // Recreate ROB from scratch
+  ROB = Array(8).fill(null).map(() => ({
+    busy: false,
+    instruction: null,
+    destReg: null,
+    value: null,
+    ready: false,
+    BranchPC: 0,
+    BranchTaken: false,
+    targetPC: 0,
+    addr: 0
+  }));
   
   // Reset counters
   CycleCounter.value = 1;
   InstructionCount = 0;
   
+  // Reset CMDB
+  clearCDB();
+  
   // Clear instruction queue
-  IQ.length = 0;
+  IQ = [];
 }
 
 
