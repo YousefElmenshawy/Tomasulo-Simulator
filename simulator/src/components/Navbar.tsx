@@ -16,11 +16,11 @@ export default function NavBar({ children }:{children:React.ReactNode}) {
   const [programText, setProgramText] = useState('');
 
   const availableInstructions = [
-    'L.D', 'S.D', 'ADD.D', 'SUB.D', 'MUL.D', 'DIV.D'   // to be changed
+    'LOAD', 'STORE', 'ADD', 'SUB', 'MUL', 'NAND','BEQ','CALL','RET'   // to be changed
   ];
 
   const registers = ['F0', 'F2', 'F4', 'F6', 'F8', 'F10', 'F12', 'F14'];
-  const baseRegisters = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
+  const baseRegisters = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5','R6','R7','R8'];
 
   const addInstruction = () => {
     setInstructions([...instructions, { 

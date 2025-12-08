@@ -10,10 +10,11 @@ export interface Instruction {
     execCycleStart?: number; // When execution starts
     execCycleEnd?: number;   // When execution ends
     writeCycle?: number;
-    commitCycle?: number;
+    commitCycleStart?: number;
+    commitCyclesEnd?:number
 
     addressComputeStart?: number; // For LOAD/STORE address computation (separate from execution)
-
+    commitCyclesNeeded?: number
     execCyclesNeeded?: number;
 }
 

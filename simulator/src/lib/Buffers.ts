@@ -40,11 +40,16 @@ export const MemoryViewer = new Int32Array(Memory).fill(0); // Word Addressable
   CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', dest: '',qi:null as number | null }))
 };
 export interface ROBEntry {
-  busy: boolean;
-  instruction: Instruction | null;
-  destReg: string | null; // destination register
-  value: number | null;   // result
-  ready: boolean; 
+  busy: boolean
+  instruction: Instruction | null
+  destReg: string | null // destination register
+  value: number | null   // result
+  ready: boolean
+  BranchPC: number
+  addr:number
+  BranchTaken:boolean
+  targetPC: number
+  
 }
 
 export let ROB: ROBEntry[] = Array(8).fill(null).map(() => ({
@@ -52,7 +57,11 @@ export let ROB: ROBEntry[] = Array(8).fill(null).map(() => ({
   instruction: null,
   destReg: null,
   value: null,
-  ready: false
+  ready: false,
+  BranchPC:0, // For BEQ
+  BranchTaken: false,        
+  targetPC: 0,
+  addr:0
 }));
 
 // ROB helper function
@@ -66,6 +75,11 @@ export function allocateROB(inst: Instruction): number {
             ROB[i].ready = false;
             ROB[i].value = null;
             ROB[i].destReg = null;
+            ROB[i].addr = 0;
+            ROB[i].BranchPC=0;
+            ROB[i].targetPC=0;
+            ROB[i].BranchTaken = false;
+
             return i;
         }
     }
@@ -175,6 +189,11 @@ export function resetSimulator(): void {
     entry.destReg = null;
     entry.value = null;
     entry.ready = false;
+    entry.BranchPC = 0;
+    entry.addr = 0;
+    entry.BranchPC=0;
+    entry.targetPC=0;
+    entry.BranchTaken = false;
   });
   
   // Reset counters
