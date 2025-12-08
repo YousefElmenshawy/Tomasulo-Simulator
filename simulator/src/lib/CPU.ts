@@ -21,6 +21,11 @@ private NumCycles = CycleCounter ;
 private ReOrderBuffer = ROB;
 private CommonDataBus = CMDB;
 
+// Getter for PC
+public getPC(): number {
+    return this.PC;
+}
+
 constructor(InstAddress:number ,Memdata: Array<[number,number]>, program: Array<string> ){ // Inputs DataMemory and Starting Address
 
 this.PC = InstAddress;
@@ -91,11 +96,15 @@ private issue(inst: Instruction): void {
             return;
     }
 
+
     if (!rs) return; // Stall - no free RS
+
 
     //  Allocate ROB entry
     const robIndex = allocateROB(inst);
     if (robIndex === -1) return; // Stall - ROB full
+
+
 
     //  Mark RS as busy
     rs.busy = true;
@@ -106,25 +115,33 @@ private issue(inst: Instruction): void {
     if (inst.opcode === "ADD" || inst.opcode === "SUB" || 
         inst.opcode === "MUL" || inst.opcode === "NAND") {
         
+        
+
+        
         // Source 1: rB
         if (inst.rB !== undefined) {
+
             if (inst.rB === 0) {
                 rs.vj = 0;
                 rs.qj = null;
             } else {
                 const tag = this.RegTable[inst.rB].ROB;
                 if (tag === 0) {
+
                     rs.vj = this.Registers[inst.rB].value;
                     rs.qj = null;
                 } else if (this.ReOrderBuffer[tag].ready) {
+
                     rs.vj = this.ReOrderBuffer[tag].value ?? 0;
                     rs.qj = null;
                 } else {
+
                     rs.vj = null;
                     rs.qj = tag;
                     }
             }
         }
+
 
         // Source 2: rC
         if (inst.rC !== undefined) {
@@ -438,6 +455,7 @@ if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
             break;
             
         case "MUL":
+
             if(cyclesElapsed===11){
                 result = (rs.vj ?? 0) * (rs.vk ?? 0);
                 inst.execCycleEnd = CycleCounter.value;
@@ -581,11 +599,12 @@ private commit(): void {
             // Update PC to correct target
             this.PC = robEntry.targetPC;
             
-            //  Flush all speculative instructions from ROB
-            const FlushInstructions = this.ReOrderBuffer.slice(1); // after the Branch
+            //  Flush all speculative instructions from ROB (iterate from index 1 onwards)
+
+            // splicing cause many problems 
             
-            for (let i = 0; i < FlushInstructions.length; i++) {
-                const flushedROB = FlushInstructions[i];
+            for (let robIndex = 1; robIndex < this.ReOrderBuffer.length; robIndex++) {
+                const flushedROB = this.ReOrderBuffer[robIndex];
                 const flushedInst = flushedROB.instruction;
                 
                 // Clear the flushed instruction's cycle tracking
@@ -593,11 +612,10 @@ private commit(): void {
                     flushedInst.issueCycle = undefined;
                     flushedInst.execCycleStart = undefined;
                     flushedInst.execCycleEnd = undefined;
+                    flushedInst.writeCycle = undefined;
                     flushedInst.commitCycleStart = undefined;
                     flushedInst.commitCyclesEnd = undefined;
                 }
-                
-                const robIndex = this.ReOrderBuffer.indexOf(flushedROB); // get the ROB index
                 
                 // Free reservation stations for flushed instructions based on their opcode
                 if (flushedInst) {
@@ -693,10 +711,19 @@ private commit(): void {
                         this.RegTable[regNum].ROB = 0; // Clear the tag
                     }
                 }
+                
+                // Mark the ROB entry as not busy (so it can be reused)
+                flushedROB.busy = false;
+                flushedROB.instruction = null;
+                flushedROB.destReg = null;
+                flushedROB.value = null;
+                flushedROB.ready = false;
             }
-            this.ReOrderBuffer.splice(1); //remove all flushed Entries of ROB
+            
+            // DON'T use splice - the entries are already marked as not busy and can be reused
+            // this.ReOrderBuffer.splice(1); // REMOVED - this was causing the ROB to shrink
 
-            // Clear CMDB queue since all flushed instructions
+            // Clear CMDB queue since all flushed instructions are invalid
             this.CommonDataBus.length = 0;
 
         }
@@ -793,16 +820,7 @@ private commit(): void {
         if (entry.robIndex > 0) entry.robIndex--;
     });
 
-    // Remove the committed instruction from the Instructions array
-    //removed for now bc uses ui issues
-
-    /*
-    const instIndex = this.Instructions.indexOf(inst);
-    if (instIndex !== -1) {
-        this.Instructions.splice(instIndex, 1);
-    }
-
-    */
+    
     
 }
 
@@ -840,6 +858,7 @@ step(): void {
     // 4. ISSUE - Issue the instruction at PC (if not already issued)
     const currentInst = this.Instructions[Math.floor(this.PC)];
     if (currentInst && currentInst.issueCycle === undefined) {
+
         this.issue(currentInst);
     }
     
@@ -848,16 +867,22 @@ step(): void {
 
 
 run():void{      // run the whole program
-
-
+    // Continue running until all issued instructions have committed
+    // Check if any instruction has been issued but not yet committed
+    const allCommitted = () => {
+        return this.Instructions.every(inst => 
+            inst === undefined || inst === null || inst.commitCyclesEnd !== undefined
+        );
+    };
     
-while (this.Instructions.length>0){
-
-this.step();
-CycleCounter.value++;
-
-
-}
+    // Also check if ROB is empty and no instructions are pending
+    const robEmpty = () => {
+        return this.ReOrderBuffer.every(entry => !entry.busy);
+    };
+    
+    while (!allCommitted() || !robEmpty()) {
+        this.step();
+    }
 }
 }
 

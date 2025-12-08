@@ -11,21 +11,22 @@ interface Instruction { // will be changed
 
 export default function NavBar({ children }:{children:React.ReactNode}) {
   const [showLoadModal, setShowLoadModal] = useState(false);
-  const [loadMode, setLoadMode] = useState('builder'); // 'builder' or 'text'
+  const [loadMode, setLoadMode] = useState('builder'); // 'builder', 'text', or 'file'
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [programText, setProgramText] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const availableInstructions = [
     'LOAD', 'STORE', 'ADD', 'SUB', 'MUL', 'NAND','BEQ','CALL','RET'   // to be changed
   ];
 
-  const registers = ['F0', 'F2', 'F4', 'F6', 'F8', 'F10', 'F12', 'F14'];
-  const baseRegisters = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5','R6','R7','R8'];
+  const registers = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5','R6','R7'];
+  const baseRegisters = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5','R6','R7'];
 
   const addInstruction = () => {
     setInstructions([...instructions, { 
-      inst: 'L.D', 
-      dest: 'F0', 
+      inst: 'LOAD', 
+      dest: 'R0', 
       src1: '0', 
       src2: 'R2' 
     }]);
@@ -42,14 +43,57 @@ const updated = [...instructions];
   };
 
   const loadProgram = () => {
+    const handleProgramLoad = (window as any).simulatorHandlers?.handleProgramLoad;
+    
     if (loadMode === 'text') {
       // Parse text program
-      //to be implemented
+      const lines = programText.trim().split('\n').filter(line => line.trim() !== '');
+      if (lines.length > 0 && handleProgramLoad) {
+        handleProgramLoad(lines);
+        setShowLoadModal(false);
+      }
+    } else if (loadMode === 'file' && selectedFile) {
+      // Load from file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        const lines = content.trim().split('\n').filter(line => line.trim() !== '');
+        if (lines.length > 0 && handleProgramLoad) {
+          handleProgramLoad(lines);
+          setShowLoadModal(false);
+          setSelectedFile(null);
+        }
+      };
+      reader.readAsText(selectedFile);
     } else {
       // Load from builder
-     //to be implemented
+      const programLines = instructions.map(inst => {
+        if (inst.inst === 'LOAD' || inst.inst === 'STORE') {
+          return `${inst.inst} ${inst.dest}, ${inst.src1}(${inst.src2})`;
+        } else if (inst.inst === 'BEQ') {
+          // BEQ rA, rB, offset (dest is rA, src1 is rB, src2 is offset)
+          return `${inst.inst} ${inst.dest}, ${inst.src1}, ${inst.src2}`;
+        } else if (inst.inst === 'CALL') {
+          // CALL label/offset (only src1 is used)
+          return `${inst.inst} ${inst.src1}`;
+        } else if (inst.inst === 'RET') {
+          return inst.inst;
+        } else {
+          // ADD, SUB, MUL, NAND: rA, rB, rC
+          return `${inst.inst} ${inst.dest}, ${inst.src1}, ${inst.src2}`;
+        }
+      });
+      if (programLines.length > 0 && handleProgramLoad) {
+        handleProgramLoad(programLines);
+        setShowLoadModal(false);
+      }
     }
-    setShowLoadModal(false);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
   };
 
 
@@ -183,6 +227,19 @@ const updated = [...instructions];
                 </svg>
                 Text Editor
               </button>
+              <button
+                onClick={() => setLoadMode('file')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  loadMode === 'file' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
+                }`}
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                </svg>
+                Import File
+              </button>
             </div>
 
             {/* Modal Content */}
@@ -213,7 +270,7 @@ const updated = [...instructions];
                         ))}
                       </select>
 
-                      {(inst.inst === 'L.D' || inst.inst === 'S.D') ? (
+                      {(inst.inst === 'LOAD' || inst.inst === 'STORE') ? (
                         <>
                           <input
                             type="text"
@@ -232,6 +289,35 @@ const updated = [...instructions];
                             ))}
                           </select>
                         </>
+                      ) : inst.inst === 'BEQ' ? (
+                        <>
+                          <select
+                            value={inst.src1}
+                            onChange={(e) => updateInstruction(idx, 'src1', e.target.value)}
+                            className="bg-zinc-700 text-gray-100 px-3 py-2 rounded border border-zinc-600 focus:border-blue-500 focus:outline-none"
+                          >
+                            {registers.map(reg => (
+                              <option key={reg} value={reg}>{reg}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={inst.src2}
+                            onChange={(e) => updateInstruction(idx, 'src2', e.target.value)}
+                            placeholder="Offset"
+                            className="bg-zinc-700 text-gray-100 px-3 py-2 rounded border border-zinc-600 focus:border-blue-500 focus:outline-none w-24"
+                          />
+                        </>
+                      ) : inst.inst === 'CALL' ? (
+                        <input
+                          type="text"
+                          value={inst.src1}
+                          onChange={(e) => updateInstruction(idx, 'src1', e.target.value)}
+                          placeholder="Label/Offset"
+                          className="bg-zinc-700 text-gray-100 px-3 py-2 rounded border border-zinc-600 focus:border-blue-500 focus:outline-none w-32"
+                        />
+                      ) : inst.inst === 'RET' ? (
+                        <span className="text-gray-500 text-sm italic">No operands</span>
                       ) : (
                         <>
                           <select
@@ -272,22 +358,86 @@ const updated = [...instructions];
                     Add Instruction
                   </button>
                 </div>
-              ) : (
+              ) : loadMode === 'text' ? (
                 <div className="space-y-3">
                   <p className="text-gray-400 text-sm">
-                    Enter your program in assembly format. Example:
+                    Enter your program in assembly format. Each instruction on a new line. Example:
                   </p>
                   <div className="bg-zinc-800 p-3 rounded-lg text-sm font-mono text-gray-400">
-                    L.D F6, 34, R2<br />
-                    MUL.D F0, F2, F4<br />
-                    SUB.D F8, F6, F2
+                    LOAD R6, 34(R2)<br />
+                    MUL R0, R2, R4<br />
+                    SUB R5, R6, R2
                   </div>
                   <textarea
                     value={programText}
                     onChange={(e) => setProgramText(e.target.value)}
-                    placeholder="L.D F6, 34, R2&#10;MUL.D F0, F2, F4&#10;SUB.D F8, F6, F2"
+                    placeholder="LOAD R6, 34(R2)&#10;MUL R0, R2, R4&#10;SUB R5, R6, R2"
                     className="w-full h-64 bg-zinc-800 text-gray-100 p-4 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none font-mono text-sm resize-none"
                   />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-gray-400 text-sm">
+                    <p className="mb-2">Upload a text file containing your assembly program.</p>
+                    <p>Each instruction should be on a new line. Supported formats:</p>
+                  </div>
+                  <div className="bg-zinc-800 p-3 rounded-lg text-sm font-mono text-gray-400">
+                    LOAD R6, 34(R2)<br />
+                    LOAD R2, 45(R3)<br />
+                    MUL R0, R2, R4<br />
+                    SUB R5, R6, R2<br />
+                    ADD R7, R0, R2
+                  </div>
+                  
+                  <div className="border-2 border-dashed border-zinc-700 rounded-lg p-8 text-center">
+                    <input
+                      type="file"
+                      accept=".txt,.asm"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className="cursor-pointer flex flex-col items-center gap-3"
+                    >
+                      <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center">
+                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="text-blue-400">
+                          <path d="M7.646 4.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 3.293V.5a.5.5 0 0 0-1 0v2.793L6.354 2.146a.5.5 0 1 0-.708.708l2 2z"/>
+                          <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-blue-400 font-medium mb-1">
+                          {selectedFile ? selectedFile.name : 'Click to select a file'}
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          or drag and drop
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        TXT or ASM files only
+                      </p>
+                    </label>
+                  </div>
+                  
+                  {selectedFile && (
+                    <div className="flex items-center gap-3 bg-zinc-800 p-4 rounded-lg">
+                      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" className="text-blue-400">
+                        <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-gray-200 text-sm font-medium">{selectedFile.name}</p>
+                        <p className="text-gray-500 text-xs">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        className="p-2 hover:bg-red-900/30 text-red-400 rounded transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -297,7 +447,11 @@ const updated = [...instructions];
               <div className="text-sm text-gray-500">
                 {loadMode === 'builder' 
                   ? `${instructions.length} instruction${instructions.length !== 1 ? 's' : ''}`
-                  : 'Text mode'
+                  : loadMode === 'text'
+                  ? 'Text mode'
+                  : selectedFile
+                  ? `File: ${selectedFile.name}`
+                  : 'No file selected'
                 }
               </div>
               <div className="flex gap-3">
@@ -309,7 +463,18 @@ const updated = [...instructions];
                 </button>
                 <button
                   onClick={loadProgram}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                  disabled={
+                    (loadMode === 'builder' && instructions.length === 0) ||
+                    (loadMode === 'text' && programText.trim() === '') ||
+                    (loadMode === 'file' && !selectedFile)
+                  }
+                  className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                    (loadMode === 'builder' && instructions.length === 0) ||
+                    (loadMode === 'text' && programText.trim() === '') ||
+                    (loadMode === 'file' && !selectedFile)
+                      ? 'bg-zinc-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
                   Load Program
                 </button>

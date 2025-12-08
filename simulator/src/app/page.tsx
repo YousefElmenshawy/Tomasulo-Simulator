@@ -21,13 +21,12 @@ export default function Home() {
   const [, forceUpdate] = useState(0);
   
   // Store the program strings for display
-  const [programStrings] = useState([
-    "LOAD R6, 34(R2)",
-    "LOAD R2, 45(R3)",
-    "MUL R0, R2, R4",
-    "SUB R5, R6, R2",
-    "ADD R7, R0, R2",
-    "ADD R6, R4, R2",
+  const [programStrings, setProgramStrings] = useState([
+    "LOAD R1, 0(R0)",
+"BEQ R0, R0, 2",	
+"LOAD R2, 34(R0)",	
+"ADD R1, R1, R1",	
+"MUL R5, R2, R2"
   ]);
 
   // Initialize CPU
@@ -44,7 +43,7 @@ export default function Home() {
     setCpu(cpuInstance);
     // Force a re-render after CPU is initialized
     forceUpdate(prev => prev + 1);
-  }, []);
+  }, [programStrings]);
 
   const handleStep = useCallback(() => {
     if (cpu) {
@@ -77,16 +76,25 @@ export default function Home() {
     forceUpdate(prev => prev + 1);
   }, [programStrings]);
 
+  // Handler for loading a new program
+  const handleProgramLoad = useCallback((newProgramStrings: string[]) => {
+    setProgramStrings(newProgramStrings);
+  }, []);
+
   // Expose handlers to window for Navbar to access
   useEffect(() => {
     (window as any).simulatorHandlers = {
       handleStep,
       handleRun,
-      handleReset
+      handleReset,
+      handleProgramLoad
     };
-  }, [cpu, handleStep, handleRun, handleReset]);
+  }, [cpu, handleStep, handleRun, handleReset, handleProgramLoad]);
 
   // Map program strings to display format
+  //NOTE: FOllOWING FUNCTION AI GENERATED
+
+
   const program = programStrings.map((instStr, idx) => {
     const inst = IQ[idx]; // Get the parsed instruction for timing info if available
     
@@ -97,12 +105,30 @@ export default function Home() {
     // or OPCODE dest, src1, src2 for ALU ops
     const loadStoreMatch = instStr.match(/(\w+)\s+R(\d+),\s*(-?\d+)\(R(\d+)\)/);
     const aluMatch = instStr.match(/(\w+)\s+R(\d+),\s*R(\d+),\s*R(\d+)/);
+    const beqMatch = instStr.match(/BEQ\s+(R\d+|\d+),\s*(R\d+|\d+),\s*(-?\d+)/);
+    const callMatch = instStr.match(/CALL\s+(-?\d+)/);
+    const retMatch = instStr.match(/RET/);
     
     if (loadStoreMatch) {
       // LOAD/STORE format: LOAD R6, 34(R2)
       dest = `R${loadStoreMatch[2]}`;
       src1 = loadStoreMatch[3]; // offset
       src2 = `R${loadStoreMatch[4]}`;
+    } else if (beqMatch) {
+      // BEQ format: BEQ R0, 0, 8 or BEQ R0, R1, 8
+      dest = beqMatch[1]; 
+      src1 = beqMatch[2]; 
+      src2 = beqMatch[3]; 
+    } else if (callMatch) {
+      // CALL format: CALL 5
+      dest = '-';
+      src1 = callMatch[1]; // Label/offset
+      src2 = '-';
+    } else if (retMatch) {
+      // RET format: RET (no operands)
+      dest = '-';
+      src1 = '-';
+      src2 = '-';
     } else if (aluMatch) {
       // ALU format: ADD R6, R4, R2
       dest = `R${aluMatch[2]}`;
@@ -297,6 +323,13 @@ export default function Home() {
           <h2 className="text-xl font-semibold mb-3 text-gray-200">Current Cycle</h2>
           <div className="flex items-center justify-center h-full">
             <div className="text-6xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-3 text-gray-200">PC</h2>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-6xl font-bold text-blue-400">{cpu?.getPC() ?? 0}</div>
           </div>
         </div>
 
