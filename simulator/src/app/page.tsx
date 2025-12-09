@@ -22,6 +22,7 @@ export default function Home() {
   
   // Store the program strings for display
   // Sum from 1 to 5: sum = 1 + 2 + 3 + 4 + 5 = 15
+
   const [programStrings, setProgramStrings] = useState([
     "LOAD R1, 0(R0)",      // R1 = 5 (upper limit)
     "LOAD R2, 1(R0)",      // R2 = 1 (counter, starts at 1)
@@ -45,6 +46,7 @@ export default function Home() {
       [2, 0],      // sum = 0
       [3, 1],      // constant 1
     ];
+    
     
     const cpuInstance = new CPU(0, memData, programStrings);
     setCpu(cpuInstance);
@@ -71,11 +73,12 @@ export default function Home() {
     resetSimulator();
     
     const memData: Array<[number, number]> = [
-      [0, 6],      // upper limit = 5
+      [0, 6],      // upper limit = 6
       [1, 1],      // counter = 1
       [2, 0],      // sum = 0
       [3, 1],      // constant 1
     ];
+    
     
     const cpuInstance = new CPU(0, memData, programStrings);
     setCpu(cpuInstance);
