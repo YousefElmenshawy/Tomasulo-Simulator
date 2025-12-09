@@ -624,9 +624,10 @@ if (rs.qk !== null && rs.qk !== undefined) {
             
             // Store branch result in ROB
             result = equal ? 1 : 0;
+            robEntry.BranchTaken = equal;
+            robEntry.targetPC = targetPC;
             inst.execCycleEnd = CycleCounter.value;
             break;
-            
         case "CALL":
             
             // Calculate call target address from offset
@@ -675,7 +676,6 @@ private write(): void {
 
     
 }
-
 private commit(): void {
     // Get ROB head (first element in our array)
        
@@ -713,23 +713,23 @@ private commit(): void {
             const branchPCOld = robEntry.BranchPC;
             this.PC = robEntry.targetPC;
 
-
-            // Clear instructions in the instruction queue that were in the branch region
-            if(this.PC < branchPCOld)
+            // Clear instructions in the instruction queue between branchPC and targetPC
+            // Handle both forward branches (targetPC > branchPCOld) and backward branches (targetPC < branchPCOld)
+            const startPC = Math.min(branchPCOld + 1, this.PC);
+            const endPC = Math.max(branchPCOld, this.PC - 1);
+            
+            for(let i = startPC; i <= endPC; i++)
             {
-                for(let i=this.PC; i<=branchPCOld; i++)
-                {
-                    const flushedInst = this.Instructions[i];
+                const flushedInst = this.Instructions[i];
 
-                    // Clear the flushed instruction's cycle tracking
-                if (flushedInst) {
+                // Clear the flushed instruction's cycle tracking
+                if (flushedInst && flushedInst !== inst) {
                     flushedInst.issueCycle = undefined;
                     flushedInst.execCycleStart = undefined;
                     flushedInst.execCycleEnd = undefined;
                     flushedInst.writeCycle = undefined;
                     flushedInst.commitCycleStart = undefined;
                     flushedInst.commitCyclesEnd = undefined;
-                }
                 }
             }
             
@@ -854,6 +854,10 @@ private commit(): void {
                 flushedROB.destReg = null;
                 flushedROB.value = null;
                 flushedROB.ready = false;
+                flushedROB.BranchPC = 0;
+                flushedROB.targetPC = 0;
+                flushedROB.BranchTaken = false;
+                flushedROB.addr = 0;
             }
             
         
@@ -862,12 +866,19 @@ private commit(): void {
             this.CommonDataBus.length = 0;
 
         }
+        // If not taken, PC already correct (incremented normally)
+        
+        // BEQ doesn't write to registers, just needs to be removed from ROB
+        // Fall through to common commit logic below
     }
     // Handle STORE( write to memory)
     else if (inst.opcode === "STORE") {
         if(cyclesElapsed===3){
         const addr = robEntry.addr ?? 0;
         const value = robEntry.value ?? 0;
+        console.log(addr);
+        console.log(value);
+
 
         this.Memory[addr] = value;
         
@@ -998,6 +1009,10 @@ private commit(): void {
             flushedROB.destReg = null;
             flushedROB.value = null;
             flushedROB.ready = false;
+            flushedROB.BranchPC = 0;
+            flushedROB.targetPC = 0;
+            flushedROB.BranchTaken = false;
+            flushedROB.addr = 0;
         }
         
         // Clear CMDB queue since all flushed instructions are invalid
@@ -1153,6 +1168,10 @@ private commit(): void {
             flushedROB.destReg = null;
             flushedROB.value = null;
             flushedROB.ready = false;
+            flushedROB.BranchPC = 0;
+            flushedROB.targetPC = 0;
+            flushedROB.BranchTaken = false;
+            flushedROB.addr = 0;
         }
         
         // Clear CMDB queue since all flushed instructions are invalid
@@ -1168,7 +1187,6 @@ private commit(): void {
 
     }
     // Normal register write for other instructions
-    
     else if (robEntry.destReg && robEntry.destReg !== "") {
         const regNum = parseInt(robEntry.destReg.substring(1));
         this.Registers[regNum].value = robEntry.value ?? 0;
@@ -1281,8 +1299,10 @@ private commit(): void {
     this.CommonDataBus.forEach(entry => {
         if (entry.robIndex > 0) entry.robIndex--;
     });
-}
 
+    
+    
+}
 step(): void {
     // One cycle - process all instructions in proper order
     // Order: Commit -> Write -> Execute -> Issue (reverse pipeline order)

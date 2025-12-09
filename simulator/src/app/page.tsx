@@ -20,8 +20,6 @@ export default function Home() {
   const [cpu, setCpu] = useState<CPU | null>(null);
   const [, forceUpdate] = useState(0);
   
-  // Store the program strings for display
-  // Sum from 1 to 5: sum = 1 + 2 + 3 + 4 + 5 = 15
 
   const [programStrings, setProgramStrings] = useState([
     "LOAD R2, 0(R0)",      // PC=0: Load value 5 into R2
@@ -30,14 +28,16 @@ export default function Home() {
     "STORE R4, 45(R0)",    // PC=3: Store result after return
     "BEQ R0, R0, 4",       // PC=4: End program (infinite loop or halt)
     "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
-    "RET"           
+    "RET"       ,    
+        "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+            "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+    "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+    "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+
   ]);
 
   // Initialize CPU
   useEffect(() => {
-    // Reset all state first to ensure clean start
-    resetSimulator();
-    
     const memData: Array<[number, number]> = [
       [0, 5],
       [34, 10],
@@ -45,7 +45,6 @@ export default function Home() {
       [50, 3.0],
       [100, 4.2],
     ];
-    
     
     const cpuInstance = new CPU(0, memData, programStrings);
     setCpu(cpuInstance);
@@ -72,10 +71,11 @@ export default function Home() {
     resetSimulator();
     
     const memData: Array<[number, number]> = [
-      [0, 6],      // upper limit = 6
-      [1, 1],      // counter = 1
-      [2, 0],      // sum = 0
-      [3, 1],      // constant 1
+      [0, 5],
+      [34, 10],
+      [45, 0],
+      [50, 3.0],
+      [100, 4.2],
     ];
     
     
