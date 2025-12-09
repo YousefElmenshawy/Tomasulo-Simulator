@@ -22,18 +22,19 @@ export default function Home() {
   
   // Store the program strings for display
   const [programStrings, setProgramStrings] = useState([
-    "LOAD R1, 0(R0)",
-"BEQ R0, R0, 2",	
-"LOAD R2, 34(R0)",	
-"ADD R1, R1, R1",	
-"MUL R5, R2, R2"
+    "LOAD R1, 0(R0)" ,    
+"LOAD R2, 1(R0)   "  ,
+"ADD R3, R1, R1    " , 
+"SUB R1, R1, R2   "  ,
+"BEQ R0, R0, -3 ",     
+"MUL R4, R3, R3  "   
   ]);
 
   // Initialize CPU
   useEffect(() => {
     const memData: Array<[number, number]> = [
       [0, 0],
-      [34, 1.5],
+      [34, 3],
       [45, 2.5],
       [50, 3.0],
       [100, 4.2],
@@ -64,12 +65,12 @@ export default function Home() {
     resetSimulator();
     
     const memData: Array<[number, number]> = [
-      [0, 0],
-      [34, 1.5],
-      [45, 2.5],
-      [50, 3.0],
-      [100, 4.2],
-    ];
+  [0, 0],
+  [34, 3],      // Note: shows 3 here
+  [45, 2.5],
+  [50, 3.0],
+  [100, 4.2],
+];
     
     const cpuInstance = new CPU(0, memData, programStrings);
     setCpu(cpuInstance);
@@ -329,7 +330,7 @@ export default function Home() {
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
           <h2 className="text-xl font-semibold mb-3 text-gray-200">PC</h2>
           <div className="flex items-center justify-center h-full">
-            <div className="text-6xl font-bold text-blue-400">{cpu?.getPC() ?? 0}</div>
+            <div className="text-6xl font-bold text-blue-400">{ (cpu?.getPC() ?? 0) - 1}</div>
           </div>
         </div>
 

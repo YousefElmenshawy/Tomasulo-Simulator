@@ -68,7 +68,9 @@ export let ROB: ROBEntry[] = Array(8).fill(null).map(() => ({
 
 // Allocate a free ROB entry for an instruction
 export function allocateROB(inst: Instruction): number {
+  
     for (let i = 0; i < ROB.length; i++) {
+      
         if (!ROB[i].busy) {
             ROB[i].busy = true;
             ROB[i].instruction = inst;
@@ -79,6 +81,8 @@ export function allocateROB(inst: Instruction): number {
             ROB[i].BranchPC=0;
             ROB[i].targetPC=0;
             ROB[i].BranchTaken = false;
+            
+            
 
             return i;
         }

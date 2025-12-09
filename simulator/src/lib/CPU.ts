@@ -45,7 +45,8 @@ this.Instructions[i] = decodeInst(program[i]);
 }
 
 private issue(inst: Instruction): void {
- 
+         
+
    
     if (!inst) return;
     
@@ -103,6 +104,8 @@ private issue(inst: Instruction): void {
     //  Allocate ROB entry
     const robIndex = allocateROB(inst);
     if (robIndex === -1) return; // Stall - ROB full
+
+    
 
 
 
@@ -214,19 +217,22 @@ private issue(inst: Instruction): void {
             } else {
                 const tag = this.RegTable[inst.rA].ROB;
                 if (tag === 0) {
+                    // No pending write, read directly from register
                     rs.vj = this.Registers[inst.rA].value;
                     rs.qj = null;
                 } else if (this.ReOrderBuffer[tag].ready) {
+                    // Producer is ready, forward the value from ROB
                     rs.vj = this.ReOrderBuffer[tag].value ?? 0;
                     rs.qj = null;
                 } else {
+                    // Producer not ready, set dependency
                     rs.vj = null;
                     rs.qj = tag;
                 }
             }
         }
 
- // Base address: rB
+        // Base address: rB
         if (inst.rB !== undefined) {
             if (inst.rB === 0) {
                 rs.vk = 0;
@@ -234,12 +240,15 @@ private issue(inst: Instruction): void {
             } else {
                 const tag = this.RegTable[inst.rB].ROB;
                 if (tag === 0) {
+                    // No pending write, read directly from register
                     rs.vk = this.Registers[inst.rB].value;
                     rs.qk = null;
                 } else if (this.ReOrderBuffer[tag].ready) {
+                    // Producer is ready, forward the value from ROB
                     rs.vk = this.ReOrderBuffer[tag].value ?? 0;
                     rs.qk = null;
                 } else {
+                    // Producer not ready, set dependency
                     rs.vk = null;
                     rs.qk = tag;
                 }
@@ -249,7 +258,7 @@ private issue(inst: Instruction): void {
         // Offset
         rs.addr = inst.offset ?? 0;
 
-  // STORE doesn't write to registers, but we mark ROB
+        // STORE doesn't write to registers, but we mark ROB
         this.ReOrderBuffer[robIndex].destReg = "";
     }
 
@@ -355,7 +364,7 @@ else if (inst.opcode === "CALL") {
 private execute(inst: Instruction): void {
     if (!inst) return;
     
-  
+      
     if (inst.execCycleEnd !== undefined) return;  // probably redundant but to be safe
     
     // Find the ROB entry for this instruction
@@ -393,7 +402,8 @@ private execute(inst: Instruction): void {
     }
     
     if (!rs) return; // RS not found or already freed
-    
+
+
     // Check if operands are ready
 
 
@@ -497,6 +507,8 @@ if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
                 const effectiveAddr = (rs.vk ?? 0) + (rs.addr ?? 0);
                 robEntry.addr = effectiveAddr;  // Store for UI to display
                  result = rs.vj;
+            
+                 robEntry.value = result;
                  inst.execCycleEnd = CycleCounter.value;
             }
             else {
@@ -572,11 +584,16 @@ private write(): void {
 
 private commit(): void {
     // Get ROB head (first element in our array)
+       
+
     
     const robEntry = this.ReOrderBuffer[0];
     if (!robEntry || !robEntry.ready) return;
+
     
     const inst = robEntry.instruction;
+
+    
     if (!inst) return;
 
    
@@ -589,6 +606,8 @@ private commit(): void {
         inst.commitCyclesNeeded = 1;
        
     }
+        
+
 
      const cyclesElapsed = CycleCounter.value - inst.commitCycleStart;
     // Handle BEQ: check for branch misprediction
@@ -597,7 +616,28 @@ private commit(): void {
         if (taken) {
             // in case of misprediction
             // Update PC to correct target
+            const branchPCOld = robEntry.BranchPC;
             this.PC = robEntry.targetPC;
+
+            // Clear instructions in the instruction queue that were in the branch region
+            if(this.PC < branchPCOld)
+            {
+                for(let i=this.PC; i<=branchPCOld; i++)
+                {
+                    const flushedInst = this.Instructions[i];
+
+                    // Clear the flushed instruction's cycle tracking
+                if (flushedInst) {
+                    flushedInst.issueCycle = undefined;
+                    flushedInst.execCycleStart = undefined;
+                    flushedInst.execCycleEnd = undefined;
+                    flushedInst.writeCycle = undefined;
+                    flushedInst.commitCycleStart = undefined;
+                    flushedInst.commitCyclesEnd = undefined;
+                }
+                }
+            }
+            
             
             //  Flush all speculative instructions from ROB (iterate from index 1 onwards)
 
@@ -720,20 +760,26 @@ private commit(): void {
                 flushedROB.ready = false;
             }
             
-            // DON'T use splice - the entries are already marked as not busy and can be reused
-            // this.ReOrderBuffer.splice(1); // REMOVED - this was causing the ROB to shrink
+        
 
             // Clear CMDB queue since all flushed instructions are invalid
             this.CommonDataBus.length = 0;
 
         }
         // If not taken, PC already correct (incremented normally)
+        
+        // BEQ doesn't write to registers, just needs to be removed from ROB
+        // Fall through to common commit logic below
     }
     // Handle STORE( write to memory)
     else if (inst.opcode === "STORE") {
         if(cyclesElapsed===3){
         const addr = robEntry.addr ?? 0;
         const value = robEntry.value ?? 0;
+        console.log(addr);
+        console.log(value);
+
+
         this.Memory[addr] = value;
         
         }
@@ -763,6 +809,20 @@ private commit(): void {
         this.RegTable[regNum].ROB = 0; // Clear tag
     }
     inst.commitCyclesEnd = CycleCounter.value;  // Mark as ended 
+    
+    // Special case: If this is a backward branch (loop), clear the instruction's cycle tracking
+    // so it can be re-executed in the next iteration
+    if (inst.opcode === "BEQ" && robEntry.BranchTaken && 
+        robEntry.targetPC !== undefined && robEntry.targetPC <= robEntry.BranchPC) {
+        // Clear all cycle tracking for the BEQ so it can loop
+        inst.issueCycle = undefined;
+        inst.execCycleStart = undefined;
+        inst.execCycleEnd = undefined;
+        inst.writeCycle = undefined;
+        inst.commitCycleStart = undefined;
+        inst.commitCyclesEnd = undefined;
+    }
+    
     // Remove from ROB
     this.ReOrderBuffer.shift(); //note: shift() removes and return the first element in the array
    

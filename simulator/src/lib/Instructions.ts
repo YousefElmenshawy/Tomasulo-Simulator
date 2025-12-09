@@ -56,6 +56,7 @@ export function decodeInst(line:string):Instruction
             return {
                 opcode,
                 rA: parseInt(match[1]), // value to store
+                
                 offset: parseInt(match[2]),
                 rB: parseInt(match[3])  // base address
             };
