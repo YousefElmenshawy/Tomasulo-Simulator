@@ -310,7 +310,7 @@ private issue(inst: Instruction): void {
         
         // Store ROB Branch entries
         this.ReOrderBuffer[robIndex].BranchPC = this.PC;
-        this.ReOrderBuffer[robIndex].targetPC = this.PC + rs.addr;
+        this.ReOrderBuffer[robIndex].targetPC = (this.PC + rs.addr) + 1;
         this.ReOrderBuffer[robIndex].BranchTaken = false;
         // BEQ doesn't write to registers
         this.ReOrderBuffer[robIndex].destReg = "";
@@ -325,6 +325,9 @@ private issue(inst: Instruction): void {
 else if (inst.opcode === "CALL") {
         // CALL has no source operands, only immediate (label offset)
         rs.addr = inst.offset ?? 0;  // label as 7-bit signed immediate
+        
+        // Store CALL's PC for calculating return address
+        this.ReOrderBuffer[robIndex].BranchPC = this.PC;
         
         // CALL writes return address to R1
         this.RegTable[1].ROB = robIndex;
@@ -346,6 +349,9 @@ else if (inst.opcode === "CALL") {
             rs.vj = null;
             rs.qj = tag;
         }
+        
+        // Store RET's PC (like BEQ stores BranchPC)
+        this.ReOrderBuffer[robIndex].BranchPC = this.PC;
         
         // RET doesn't write to registers
         this.ReOrderBuffer[robIndex].destReg = "";
@@ -525,7 +531,15 @@ if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
             
             // Calculate branch target address
             const branchPC = robEntry.BranchPC ?? this.PC;
-            const targetPC = (!equal) ? (branchPC + 1) :(branchPC+ rs.addr+1);
+            let targetPC: number;
+            if (equal) {
+                // Branch taken: PC + offset + 1
+                const pcPlusOffset = branchPC + (rs.addr ?? 0);
+                targetPC = pcPlusOffset + 1;
+            } else {
+                // Branch not taken: PC + 1
+                targetPC = branchPC + 1;
+            }
             
             // Store branch result in ROB
             result = equal ? 1 : 0;
@@ -535,18 +549,19 @@ if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
             break;
             
         case "CALL":
-            // CALL: Store return address (PC+1), compute call target
-            result = this.PC + 1; // Return address to store in R1
             
             // Calculate call target address from offset
-            const callTarget = this.PC + rs.addr; // PC + label offset
+            const callTarget =  rs.addr; // PC + label offset
             robEntry.targetPC = callTarget; // Store target for commit
-            inst.execCycleEnd = CycleCounter.value;
+         
+            result = robEntry.BranchPC + 1; // Return address to store in R1
+               inst.execCycleEnd = CycleCounter.value;
             break;
             
         case "RET":
             // Return to address in register
             result = rs.vj ?? 0;
+            robEntry.targetPC = result??0; // Store return target PC
             inst.execCycleEnd = CycleCounter.value;
             break;
     }
@@ -728,6 +743,7 @@ private commit(): void {
                                     rs.vk = null;
                                     rs.qj = null;
                                     rs.qk = null;
+                                    rs.addr = 0;
                                     rs.qi = null;
                                 }
                             });
@@ -788,19 +804,295 @@ private commit(): void {
             return;
         }
     }
-    // Handle CALL(update PC to target)
+    // Handle CALL: update PC to target and flush speculative instructions
     else if (inst.opcode === "CALL") {
+        // Flush all speculative instructions from ROB (iterate from index 1 onwards)
+        // CALL always changes control flow, so flush everything after it
+        
+        for (let robIndex = 1; robIndex < this.ReOrderBuffer.length; robIndex++) {
+            const flushedROB = this.ReOrderBuffer[robIndex];
+            const flushedInst = flushedROB.instruction;
+            
+            // Clear the flushed instruction's cycle tracking
+            if (flushedInst) {
+                flushedInst.issueCycle = undefined;
+                flushedInst.execCycleStart = undefined;
+                flushedInst.execCycleEnd = undefined;
+                flushedInst.writeCycle = undefined;
+                flushedInst.commitCycleStart = undefined;
+                flushedInst.commitCyclesEnd = undefined;
+            }
+            
+            // Free reservation stations for flushed instructions based on their opcode
+            if (flushedInst) {
+                switch (flushedInst.opcode) {
+                    case "ADD":
+                    case "SUB":
+                        this.AddStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "MUL":
+                        this.MultStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "NAND":
+                        this.NANDStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "LOAD":
+                        this.LoadStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.qj = null;
+                                rs.addr = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "STORE":
+                        this.StoreStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "BEQ":
+                        this.BeqStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.addr = 0;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "CALL":
+                    case "RET":
+                        this.CALL_RET_Stations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                }
+            }
+            
+            // Clear register table entries that were waiting for flushed instructions
+            if (flushedROB.destReg && flushedROB.destReg !== "") {
+                const regNum = parseInt(flushedROB.destReg.substring(1));
+                if (this.RegTable[regNum].ROB === robIndex) {
+                    this.RegTable[regNum].ROB = 0; // Clear the tag
+                }
+            }
+            
+            // Mark the ROB entry as not busy (so it can be reused)
+            flushedROB.busy = false;
+            flushedROB.instruction = null;
+            flushedROB.destReg = null;
+            flushedROB.value = null;
+            flushedROB.ready = false;
+        }
+        
+        // Clear CMDB queue since all flushed instructions are invalid
+        this.CommonDataBus.length = 0;
+
         // Write return address to R1
         if (robEntry.destReg === "R1") {
             this.Registers[1].value = robEntry.value ?? 0; // Store PC+1 in R1
             this.RegTable[1].ROB = 0;
         }
+        
         // Update PC to call target (computed in execute)
         this.PC = robEntry.targetPC ?? 0;
     }
-    // Handle RET: update PC to return address
+    // Handle RET: update PC to return address and flush speculative instructions
     else if (inst.opcode === "RET") {
+        // Get RET's PC and return target PC
+        const retPC = robEntry.BranchPC ?? 0; // PC where RET was
+        const targetPC = robEntry.value ?? 0; // PC to return to (from R1)
+        
+        // Clear instructions in the instruction queue between RET and return target
+        // This handles both forward returns (targetPC > retPC) and backward returns (targetPC < retPC)
+        const startPC = Math.min(retPC, targetPC);
+        const endPC = Math.max(retPC, targetPC);
+        
+        for(let i = startPC; i <= endPC; i++) {
+            const flushedInst = this.Instructions[i];
+            // Skip the RET instruction itself
+            if (flushedInst && flushedInst !== inst) {
+                flushedInst.issueCycle = undefined;
+                flushedInst.execCycleStart = undefined;
+                flushedInst.execCycleEnd = undefined;
+                flushedInst.writeCycle = undefined;
+                flushedInst.commitCycleStart = undefined;
+                flushedInst.commitCyclesEnd = undefined;
+            }
+        }
+        
+        // Flush all speculative instructions from ROB (iterate from index 1 onwards)
+        for (let robIndex = 1; robIndex < this.ReOrderBuffer.length; robIndex++) {
+            const flushedROB = this.ReOrderBuffer[robIndex];
+            const flushedInst = flushedROB.instruction;
+            
+            // Clear the flushed instruction's cycle tracking
+            if (flushedInst) {
+                flushedInst.issueCycle = undefined;
+                flushedInst.execCycleStart = undefined;
+                flushedInst.execCycleEnd = undefined;
+                flushedInst.writeCycle = undefined;
+                flushedInst.commitCycleStart = undefined;
+                flushedInst.commitCyclesEnd = undefined;
+            }
+            
+            // Free reservation stations for flushed instructions based on their opcode
+            if (flushedInst) {
+                switch (flushedInst.opcode) {
+                    case "ADD":
+                    case "SUB":
+                        this.AddStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "MUL":
+                        this.MultStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "NAND":
+                        this.NANDStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "LOAD":
+                        this.LoadStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.qj = null;
+                                rs.addr = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "STORE":
+                        this.StoreStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "BEQ":
+                        this.BeqStations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.vj = null;
+                                rs.vk = null;
+                                rs.qj = null;
+                                rs.qk = null;
+                                rs.addr = 0;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                    case "CALL":
+                    case "RET":
+                        this.CALL_RET_Stations.forEach(rs => {
+                            if (rs.qi === robIndex) {
+                                rs.busy = false;
+                                rs.qi = null;
+                            }
+                        });
+                        break;
+                }
+            }
+            
+            // Clear register table entries that were waiting for flushed instructions
+            if (flushedROB.destReg && flushedROB.destReg !== "") {
+                const regNum = parseInt(flushedROB.destReg.substring(1));
+                if (this.RegTable[regNum].ROB === robIndex) {
+                    this.RegTable[regNum].ROB = 0; // Clear the tag
+                }
+            }
+            
+            // Mark the ROB entry as not busy (so it can be reused)
+            flushedROB.busy = false;
+            flushedROB.instruction = null;
+            flushedROB.destReg = null;
+            flushedROB.value = null;
+            flushedROB.ready = false;
+        }
+        
+        // Clear CMDB queue since all flushed instructions are invalid
+        this.CommonDataBus.length = 0;
+
+        // Write return address to R1
+        if (robEntry.destReg === "R1") {
+            this.Registers[1].value = robEntry.value ?? 0; // Store PC+1 in R1
+            this.RegTable[1].ROB = 0;
+        }
+        
         this.PC = robEntry.value ?? 0;
+
     }
     // Normal register write for other instructions
     else if (robEntry.destReg && robEntry.destReg !== "") {
@@ -810,11 +1102,47 @@ private commit(): void {
     }
     inst.commitCyclesEnd = CycleCounter.value;  // Mark as ended 
     
+// Ret
+
+
+
+
+
+
+
+
+
     // Special case: If this is a backward branch (loop), clear the instruction's cycle tracking
     // so it can be re-executed in the next iteration
     if (inst.opcode === "BEQ" && robEntry.BranchTaken && 
         robEntry.targetPC !== undefined && robEntry.targetPC <= robEntry.BranchPC) {
         // Clear all cycle tracking for the BEQ so it can loop
+        inst.issueCycle = undefined;
+        inst.execCycleStart = undefined;
+        inst.execCycleEnd = undefined;
+        inst.writeCycle = undefined;
+        inst.commitCycleStart = undefined;
+        inst.commitCyclesEnd = undefined;
+    }
+    
+    // Special case: If RET is returning to an earlier PC (backward return in a loop),
+    // clear the instruction's cycle tracking so it can be re-executed
+    if (inst.opcode === "RET" && robEntry.value !== null && 
+        robEntry.BranchPC !== undefined && robEntry.value <= robEntry.BranchPC) {
+        // Clear all cycle tracking for the RET so it can loop
+        inst.issueCycle = undefined;
+        inst.execCycleStart = undefined;
+        inst.execCycleEnd = undefined;
+        inst.writeCycle = undefined;
+        inst.commitCycleStart = undefined;
+        inst.commitCyclesEnd = undefined;
+    }
+    
+    // Special case: If CALL has a negative offset (calling backward), 
+    // clear the instruction's cycle tracking for safety (recursive/loop scenarios)
+    if (inst.opcode === "CALL" && robEntry.targetPC !== undefined && 
+        robEntry.BranchPC !== undefined && robEntry.targetPC <= robEntry.BranchPC) {
+        // Clear all cycle tracking for the CALL so it can loop
         inst.issueCycle = undefined;
         inst.execCycleStart = undefined;
         inst.execCycleEnd = undefined;
@@ -925,25 +1253,36 @@ step(): void {
     CycleCounter.value++;
 }
 
-
-run():void{      // run the whole program
-    // Continue running until all issued instructions have committed
-    // Check if any instruction has been issued but not yet committed
-    const allCommitted = () => {
-        return this.Instructions.every(inst => 
-            inst === undefined || inst === null || inst.commitCyclesEnd !== undefined
-        );
+     // run the whole program
+   run():void{     
+    // Continue running until all instructions are committed
+    // Run until: 
+    // 1. All instructions have been issued (PC >= program length)
+    // 2. ROB is empty (all issued instructions committed)
+    
+    const MAX_CYCLES = 10000; // Safety limit to prevent infinite loops
+    let cycleCount = 0;
+    
+    const allDone = () => {
+        // Check if all instructions have been issued
+        const allIssued = this.PC >= this.Instructions.length;
+        
+        // Check if ROB is empty (all committed)
+        const robEmpty = this.ReOrderBuffer.every(entry => !entry.busy);
+        
+        // Done when all instructions issued AND ROB is empty
+        return allIssued && robEmpty;
     };
     
-    // Also check if ROB is empty and no instructions are pending
-    const robEmpty = () => {
-        return this.ReOrderBuffer.every(entry => !entry.busy);
-    };
-    
-    while (!allCommitted() || !robEmpty()) {
+    // Keep stepping until all instructions are done or safety limit reached
+    while (!allDone() && cycleCount < MAX_CYCLES) {
         this.step();
+        cycleCount++;
+    }
+    
+    // Warning if we hit the cycle limit
+    if (cycleCount >= MAX_CYCLES) {
+        console.warn(`Reached maximum cycle limit (${MAX_CYCLES}). Possible infinite loop.`);
     }
 }
 }
-
-

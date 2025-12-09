@@ -36,8 +36,8 @@ export const MemoryViewer = new Int32Array(Memory).fill(0); // Word Addressable
   MULT: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '',qi:null as number | null})),
   LOAD: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
   STORE: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
-  BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '' ,qi:null as number | null})),
-  CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', dest: '',qi:null as number | null }))
+  BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
+  CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null }))
 };
 export interface ROBEntry {
   busy: boolean
@@ -52,7 +52,7 @@ export interface ROBEntry {
   
 }
 
-export let ROB: ROBEntry[] = Array(8).fill(null).map(() => ({
+export let ROB: ROBEntry[] = Array(80000).fill(null).map(() => ({
   busy: false,
   instruction: null,
   destReg: null,
@@ -136,12 +136,12 @@ export function resetSimulator(): void {
     MULT: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
     LOAD: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
     STORE: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
-    BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, dest: '', qi: null as number | null })),
-    CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', dest: '', qi: null as number | null }))
+    BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
+    CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null }))
   };
   
   // Recreate ROB from scratch
-  ROB = Array(8).fill(null).map(() => ({
+  ROB = Array(800000).fill(null).map(() => ({
     busy: false,
     instruction: null,
     destReg: null,
@@ -163,5 +163,3 @@ export function resetSimulator(): void {
   // Clear instruction queue
   IQ = [];
 }
-
-

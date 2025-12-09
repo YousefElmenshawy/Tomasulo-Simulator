@@ -22,20 +22,21 @@ export default function Home() {
   
   // Store the program strings for display
   const [programStrings, setProgramStrings] = useState([
-    "LOAD R1, 0(R0)" ,    
-"LOAD R2, 1(R0)   "  ,
-"ADD R3, R1, R1    " , 
-"SUB R1, R1, R2   "  ,
-"BEQ R0, R0, -3 ",     
-"MUL R4, R3, R3  "   
+    "LOAD R2, 0(R0)",      // PC=0: Load value 5 into R2
+    "LOAD R3, 34(R0)",     // PC=1: Load value 10 into R3
+    "CALL 5",              // PC=2: Call subroutine at PC=5 (R1 = PC+1 = 3)
+    "STORE R4, 45(R0)",    // PC=3: Store result after return
+    "BEQ R0, R0, 4",       // PC=4: End program (infinite loop or halt)
+    "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+    "RET"           
   ]);
 
   // Initialize CPU
   useEffect(() => {
     const memData: Array<[number, number]> = [
-      [0, 0],
-      [34, 3],
-      [45, 2.5],
+      [0, 5],
+      [34, 10],
+      [45, 0],
       [50, 3.0],
       [100, 4.2],
     ];
