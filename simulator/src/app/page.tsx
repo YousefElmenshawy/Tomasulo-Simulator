@@ -24,15 +24,13 @@ export default function Home() {
   // Sum from 1 to 5: sum = 1 + 2 + 3 + 4 + 5 = 15
 
   const [programStrings, setProgramStrings] = useState([
-    "LOAD R1, 0(R0)",      // R1 = 5 (upper limit)
-    "LOAD R2, 1(R0)",      // R2 = 1 (counter, starts at 1)
-    "LOAD R3, 2(R0)",      // R3 = 0 (sum accumulator)
-    "LOAD R4, 3(R0)",      // R4 = 1 (constant for incrementing)
-    "ADD R3, R3, R2",      // sum = sum + counter
-    "ADD R2, R2, R4",      // counter++
-    "BEQ R2, R1, 1",       // if counter > limit (counter == 6), exit loop
-    "BEQ R0, R0, -4",      // jump back to ADD R3, R3, R2
-    "STORE R3, 45(R0)"     // store result at memory[10]
+    "LOAD R2, 0(R0)",      // PC=0: Load value 5 into R2
+    "LOAD R3, 34(R0)",     // PC=1: Load value 10 into R3
+    "CALL 5",              // PC=2: Call subroutine at PC=5 (R1 = PC+1 = 3)
+    "STORE R4, 45(R0)",    // PC=3: Store result after return
+    "BEQ R0, R0, 4",       // PC=4: End program (infinite loop or halt)
+    "ADD R4, R2, R3",      // PC=5: Subroutine - Add R2 + R3 -> R4
+    "RET"           
   ]);
 
   // Initialize CPU
@@ -41,10 +39,11 @@ export default function Home() {
     resetSimulator();
     
     const memData: Array<[number, number]> = [
-      [0, 6],      // upper limit = 6
-      [1, 1],      // counter = 1
-      [2, 0],      // sum = 0
-      [3, 1],      // constant 1
+      [0, 5],
+      [34, 10],
+      [45, 0],
+      [50, 3.0],
+      [100, 4.2],
     ];
     
     
