@@ -16,6 +16,7 @@ export interface Instruction {
     addressComputeStart?: number; // For LOAD/STORE address computation (separate from execution)
     commitCyclesNeeded?: number
     execCyclesNeeded?: number;
+
 }
 
 export function decodeInst(line:string):Instruction  

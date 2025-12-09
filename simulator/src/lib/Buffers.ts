@@ -52,7 +52,7 @@ export interface ROBEntry {
   
 }
 
-export let ROB: ROBEntry[] = Array(8).fill(null).map(() => ({
+export let ROB: ROBEntry[] = Array(800).fill(null).map(() => ({
   busy: false,
   instruction: null,
   destReg: null,
@@ -141,7 +141,7 @@ export function resetSimulator(): void {
   };
   
   // Recreate ROB from scratch
-  ROB = Array(8).fill(null).map(() => ({
+  ROB = Array(800).fill(null).map(() => ({
     busy: false,
     instruction: null,
     destReg: null,

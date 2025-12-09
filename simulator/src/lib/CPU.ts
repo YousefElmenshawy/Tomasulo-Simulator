@@ -49,6 +49,7 @@ private issue(inst: Instruction): void {
 
    
     if (!inst) return;
+
     
     // Check if already issued
     if (inst.issueCycle !== undefined) return;
@@ -308,9 +309,9 @@ private issue(inst: Instruction): void {
         // Branch offset
         rs.addr = inst.offset ?? 0;
         
-        // Store ROB Branch entries
+
         this.ReOrderBuffer[robIndex].BranchPC = this.PC;
-        this.ReOrderBuffer[robIndex].targetPC = this.PC + rs.addr;
+        this.ReOrderBuffer[robIndex].targetPC = this.PC + rs.addr + 1;  // Calculate target: PC + offset + 1
         this.ReOrderBuffer[robIndex].BranchTaken = false;
         // BEQ doesn't write to registers
         this.ReOrderBuffer[robIndex].destReg = "";
@@ -411,7 +412,9 @@ private execute(inst: Instruction): void {
     if (robTag === null || robTag === undefined) return false;
     
     const robEntryN = this.ReOrderBuffer[robTag];
-    return robEntryN && robEntryN.ready === true;  //to differentiate between robEntry
+    const exists = robEntryN !== null && robEntryN !== undefined;
+    const ready = exists && robEntryN.ready === true;
+    return ready;  //to differentiate between robEntry
 }
 
 
@@ -420,15 +423,93 @@ private execute(inst: Instruction): void {
 
 if (!operandsReady) return; // Wait for operands
 
-// If we reach here, update values from ROB if needed
-if (rs.qj !== null && rs.qj !== undefined && InROB(rs.qj)) {
-    rs.vj = this.ReOrderBuffer[rs.qj].value ?? 0;
-    rs.qj = null;
+// If we reach here, update values from ROB if needed, or refresh from register file
+if (rs.qj !== null && rs.qj !== undefined) {
+    if (InROB(rs.qj)) {
+        rs.vj = this.ReOrderBuffer[rs.qj].value ?? 0;
+        rs.qj = null;
+    } else {
+        // ROB entry was committed, read from register file
+        // Determine which register to read based on instruction type
+        let regNum: number | undefined;
+        
+        if (inst.opcode === "STORE" || inst.opcode === "BEQ") {
+            // For STORE and BEQ, vj comes from rA
+            regNum = inst.rA;
+        } else if (inst.opcode === "RET") {
+            // For RET, vj comes from R1
+            regNum = 1;
+        } else {
+            // For ALU ops (ADD, SUB, MUL, NAND) and LOAD, vj comes from rB
+            regNum = inst.rB;
+        }
+        
+        if (regNum !== undefined) {
+            rs.vj = this.Registers[regNum].value;
+            rs.qj = null;
+        }
+    }
+} else if (rs.qj === null || rs.qj === undefined) {
+    // No dependency tag, but verify vj is correct from register file
+    // This handles cases where the tag was cleared/decremented but value may be stale
+    let regNum: number | undefined;
+    
+    if (inst.opcode === "STORE" || inst.opcode === "BEQ") {
+        regNum = inst.rA;
+    } else if (inst.opcode === "RET") {
+        regNum = 1;
+    } else if (inst.opcode === "ADD" || inst.opcode === "SUB" || inst.opcode === "MUL" || 
+               inst.opcode === "NAND" || inst.opcode === "LOAD") {
+        regNum = inst.rB;
+    }
+    
+    if (regNum !== undefined && regNum !== 0) {
+        const currentRegValue = this.Registers[regNum].value;
+        if (rs.vj !== currentRegValue) {
+            rs.vj = currentRegValue;
+        }
+    }
 }
 
-if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
-    rs.vk = this.ReOrderBuffer[rs.qk].value ?? 0;
-    rs.qk = null;
+if (rs.qk !== null && rs.qk !== undefined) {
+    if (InROB(rs.qk)) {
+        rs.vk = this.ReOrderBuffer[rs.qk].value ?? 0;
+        rs.qk = null;
+    } else {
+        // ROB entry was committed, read from register file
+        // Determine which register to read based on instruction type
+        let regNum: number | undefined;
+        
+        if (inst.opcode === "STORE" || inst.opcode === "BEQ") {
+            // For STORE and BEQ, vk comes from rB
+            regNum = inst.rB;
+        } else {
+            // For ALU ops (ADD, SUB, MUL, NAND), vk comes from rC
+            regNum = inst.rC;
+        }
+        
+        if (regNum !== undefined) {
+            rs.vk = this.Registers[regNum].value;
+            rs.qk = null;
+        }
+    }
+} else if (rs.qk === null || rs.qk === undefined) {
+    // No dependency tag, but verify vk is correct from register file
+    // This handles cases where the tag was cleared/decremented but value may be stale
+    let regNum: number | undefined;
+    
+    if (inst.opcode === "STORE" || inst.opcode === "BEQ") {
+        regNum = inst.rB;
+    } else if (inst.opcode === "ADD" || inst.opcode === "SUB" || inst.opcode === "MUL" || inst.opcode === "NAND") {
+        regNum = inst.rC;
+    }
+    
+    if (regNum !== undefined && regNum !== 0) {
+        const currentRegValue = this.Registers[regNum].value;
+        if (rs.vk !== currentRegValue) {
+            rs.vk = currentRegValue;
+        }
+    }
 }
  
     
@@ -523,14 +604,12 @@ if (rs.qk !== null && rs.qk !== undefined && InROB(rs.qk)) {
             // Compare rA and rB
             const equal = (rs.vj ?? 0) === (rs.vk ?? 0);
             
-            // Calculate branch target address
-            const branchPC = robEntry.BranchPC ?? this.PC;
-            const targetPC = (!equal) ? (branchPC + 1) :(branchPC+ rs.addr+1);
+            // Target PC was already calculated during issue, just use it
+            // Update the BranchTaken flag based on comparison result
+            robEntry.BranchTaken = equal;
             
             // Store branch result in ROB
             result = equal ? 1 : 0;
-            robEntry.BranchTaken = equal;
-            robEntry.targetPC = targetPC;
             inst.execCycleEnd = CycleCounter.value;
             break;
             
@@ -618,6 +697,7 @@ private commit(): void {
             // Update PC to correct target
             const branchPCOld = robEntry.BranchPC;
             this.PC = robEntry.targetPC;
+
 
             // Clear instructions in the instruction queue that were in the branch region
             if(this.PC < branchPCOld)
@@ -766,19 +846,12 @@ private commit(): void {
             this.CommonDataBus.length = 0;
 
         }
-        // If not taken, PC already correct (incremented normally)
-        
-        // BEQ doesn't write to registers, just needs to be removed from ROB
-        // Fall through to common commit logic below
     }
     // Handle STORE( write to memory)
     else if (inst.opcode === "STORE") {
         if(cyclesElapsed===3){
         const addr = robEntry.addr ?? 0;
         const value = robEntry.value ?? 0;
-        console.log(addr);
-        console.log(value);
-
 
         this.Memory[addr] = value;
         
@@ -803,6 +876,7 @@ private commit(): void {
         this.PC = robEntry.value ?? 0;
     }
     // Normal register write for other instructions
+    
     else if (robEntry.destReg && robEntry.destReg !== "") {
         const regNum = parseInt(robEntry.destReg.substring(1));
         this.Registers[regNum].value = robEntry.value ?? 0;
@@ -823,11 +897,16 @@ private commit(): void {
         inst.commitCyclesEnd = undefined;
     }
     
-    // Remove from ROB
-    this.ReOrderBuffer.shift(); //note: shift() removes and return the first element in the array
-   
-     //Update all ROB indices in reservation stations and register table
-    //After shift, all indices decrease by 1
+    // **NEW APPROACH**: Instead of shift(), just mark as invalid and remove
+    // Clear the committed entry
+    robEntry.busy = false;
+    robEntry.instruction = null;
+    robEntry.destReg = null;
+    robEntry.value = null;
+    robEntry.ready = false;
+    
+    // Remove from beginning (alternative to shift that's clearer about intent)
+    this.ReOrderBuffer.splice(0, 1);
     
     // Update reservation stations
     this.AddStations.forEach(rs => {
@@ -879,9 +958,6 @@ private commit(): void {
     this.CommonDataBus.forEach(entry => {
         if (entry.robIndex > 0) entry.robIndex--;
     });
-
-    
-    
 }
 
 step(): void {
@@ -927,21 +1003,34 @@ step(): void {
 
 
 run():void{      // run the whole program
-    // Continue running until all issued instructions have committed
-    // Check if any instruction has been issued but not yet committed
-    const allCommitted = () => {
-        return this.Instructions.every(inst => 
-            inst === undefined || inst === null || inst.commitCyclesEnd !== undefined
-        );
+    // Continue running until all instructions are committed
+    // Run until: 
+    // 1. All instructions have been issued (PC >= program length)
+    // 2. ROB is empty (all issued instructions committed)
+    
+    const MAX_CYCLES = 10000; // Safety limit to prevent infinite loops
+    let cycleCount = 0;
+    
+    const allDone = () => {
+        // Check if all instructions have been issued
+        const allIssued = this.PC >= this.Instructions.length;
+        
+        // Check if ROB is empty (all committed)
+        const robEmpty = this.ReOrderBuffer.every(entry => !entry.busy);
+        
+        // Done when all instructions issued AND ROB is empty
+        return allIssued && robEmpty;
     };
     
-    // Also check if ROB is empty and no instructions are pending
-    const robEmpty = () => {
-        return this.ReOrderBuffer.every(entry => !entry.busy);
-    };
-    
-    while (!allCommitted() || !robEmpty()) {
+    // Keep stepping until all instructions are done or safety limit reached
+    while (!allDone() && cycleCount < MAX_CYCLES) {
         this.step();
+        cycleCount++;
+    }
+    
+    // Warning if we hit the cycle limit
+    if (cycleCount >= MAX_CYCLES) {
+        console.warn(`Reached maximum cycle limit (${MAX_CYCLES}). Possible infinite loop.`);
     }
 }
 }

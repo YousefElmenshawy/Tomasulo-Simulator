@@ -21,23 +21,29 @@ export default function Home() {
   const [, forceUpdate] = useState(0);
   
   // Store the program strings for display
+  // Sum from 1 to 5: sum = 1 + 2 + 3 + 4 + 5 = 15
   const [programStrings, setProgramStrings] = useState([
-    "LOAD R1, 0(R0)" ,    
-"LOAD R2, 1(R0)   "  ,
-"ADD R3, R1, R1    " , 
-"SUB R1, R1, R2   "  ,
-"BEQ R0, R0, -3 ",     
-"MUL R4, R3, R3  "   
+    "LOAD R1, 0(R0)",      // R1 = 5 (upper limit)
+    "LOAD R2, 1(R0)",      // R2 = 1 (counter, starts at 1)
+    "LOAD R3, 2(R0)",      // R3 = 0 (sum accumulator)
+    "LOAD R4, 3(R0)",      // R4 = 1 (constant for incrementing)
+    "ADD R3, R3, R2",      // sum = sum + counter
+    "ADD R2, R2, R4",      // counter++
+    "BEQ R2, R1, 1",       // if counter > limit (counter == 6), exit loop
+    "BEQ R0, R0, -4",      // jump back to ADD R3, R3, R2
+    "STORE R3, 45(R0)"     // store result at memory[10]
   ]);
 
   // Initialize CPU
   useEffect(() => {
+    // Reset all state first to ensure clean start
+    resetSimulator();
+    
     const memData: Array<[number, number]> = [
-      [0, 0],
-      [34, 3],
-      [45, 2.5],
-      [50, 3.0],
-      [100, 4.2],
+      [0, 6],      // upper limit = 6
+      [1, 1],      // counter = 1
+      [2, 0],      // sum = 0
+      [3, 1],      // constant 1
     ];
     
     const cpuInstance = new CPU(0, memData, programStrings);
@@ -65,12 +71,11 @@ export default function Home() {
     resetSimulator();
     
     const memData: Array<[number, number]> = [
-  [0, 0],
-  [34, 3],      // Note: shows 3 here
-  [45, 2.5],
-  [50, 3.0],
-  [100, 4.2],
-];
+      [0, 6],      // upper limit = 5
+      [1, 1],      // counter = 1
+      [2, 0],      // sum = 0
+      [3, 1],      // constant 1
+    ];
     
     const cpuInstance = new CPU(0, memData, programStrings);
     setCpu(cpuInstance);
