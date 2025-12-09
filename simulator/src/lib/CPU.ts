@@ -1,4 +1,4 @@
-import {RF,RegistersTable,reservationStations,IQ,InstructionCount,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter, CMDB, enqueueCDB, dequeueCDB}from "./Buffers"
+import {RF,RegistersTable,reservationStations,IQ,InstructionCounter,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter, CMDB, enqueueCDB, dequeueCDB}from "./Buffers"
 import { Instruction,decodeInst } from "./Instructions";
 
 
@@ -20,10 +20,19 @@ private Instructions = IQ;
 private NumCycles = CycleCounter ;  
 private ReOrderBuffer = ROB;
 private CommonDataBus = CMDB;
+private branchCount = 0;
+private branchMispredictions = 0;
+private IC = InstructionCounter
 
 // Getter for PC
 public getPC(): number {
     return this.PC;
+}
+
+// Getter for branch misprediction percentage
+public getBranchMispredictionRate(): number {
+    if (this.branchCount === 0) return 0;
+    return (this.branchMispredictions / this.branchCount) * 100;
 }
 
 constructor(InstAddress:number ,Memdata: Array<[number,number]>, program: Array<string> ){ // Inputs DataMemory and Starting Address
@@ -706,9 +715,12 @@ private commit(): void {
      const cyclesElapsed = CycleCounter.value - inst.commitCycleStart;
     // Handle BEQ: check for branch misprediction
     if (inst.opcode === "BEQ") {
+        this.branchCount++;
         const taken = robEntry.BranchTaken;
         if (taken) {
-            // in case of misprediction
+            // Branch was taken - this is a misprediction (we predict not taken)
+            this.branchMispredictions++;
+            
             // Update PC to correct target
             const branchPCOld = robEntry.BranchPC;
             this.PC = robEntry.targetPC;
@@ -1193,6 +1205,7 @@ private commit(): void {
         this.RegTable[regNum].ROB = 0; // Clear tag
     }
     inst.commitCyclesEnd = CycleCounter.value;  // Mark as ended 
+    this.IC.value++;  // Increment instruction count on commit 
     
 // Ret
 

@@ -95,6 +95,7 @@ export function allocateROB(inst: Instruction): number {
 
 // Cycle counter - using an object so it can be modified by reference
 export const CycleCounter = { value: 1 };
+export const InstructionCounter = { value: 0 };
 
 // Common Data Bus
 export const CMDB: Array<{ robIndex: number; value: number }> = []; //has to be queue to store (as if result saved in executing)
@@ -113,7 +114,7 @@ export function clearCDB(): void {  //for reset
 
 // Export getter for backward compatibility
 export const getCycleCount = () => CycleCounter.value;
-export let InstructionCount = 0;  // Number of Instructions
+export const getInstructionCount = () => InstructionCounter.value; // Number of Instructions
 
 
 export let IQ:Array<Instruction> = []; // Instruction Queue to be filled Later
@@ -155,7 +156,7 @@ export function resetSimulator(): void {
   
   // Reset counters
   CycleCounter.value = 1;
-  InstructionCount = 0;
+  InstructionCounter.value = 0;
   
   // Reset CMDB
   clearCDB();

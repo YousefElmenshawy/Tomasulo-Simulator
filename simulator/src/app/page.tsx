@@ -12,7 +12,7 @@ import {
   CycleCounter, 
   MemoryViewer, 
   ROB,
-  InstructionCount,
+  InstructionCounter,
   resetSimulator
 } from '@/lib/Buffers';
 
@@ -337,7 +337,7 @@ export default function Home() {
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
           <h2 className="text-xl font-semibold mb-3 text-gray-200">PC</h2>
           <div className="flex items-center justify-center h-full">
-            <div className="text-6xl font-bold text-blue-400">{ (cpu?.getPC() ?? 0) - 1}</div>
+            <div className="text-6xl font-bold text-blue-400">{Math.max(0, (cpu?.getPC() ?? 0) - 1)}</div>
           </div>
         </div>
 
@@ -639,22 +639,26 @@ export default function Home() {
       {/* Performance Metrics */}
       <div className="max-w-7xl mx-auto mt-6 bg-zinc-900 rounded-lg p-4 border border-zinc-800">
         <h2 className="text-xl font-semibold mb-4 text-gray-200">Performance Metrics</h2>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="bg-zinc-800 rounded p-4">
             <div className="text-sm text-gray-500">Total Cycles</div>
-            <div className="text-2xl font-bold text-blue-400">0</div>
+            <div className="text-2xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
           </div>
           <div className="bg-zinc-800 rounded p-4">
             <div className="text-sm text-gray-500">Instructions Completed</div>
-            <div className="text-2xl font-bold text-green-400">0</div>
+            <div className="text-2xl font-bold text-green-400">{InstructionCounter.value}</div>
           </div>
           <div className="bg-zinc-800 rounded p-4">
             <div className="text-sm text-gray-500">IPC</div>
-            <div className="text-2xl font-bold text-purple-400">0.00</div>
+            <div className="text-2xl font-bold text-purple-400">
+              {(InstructionCounter.value / Math.max(1, CycleCounter.value - 1)).toFixed(2)}
+            </div>
           </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 mt-4">
           <div className="bg-zinc-800 rounded p-4">
-            <div className="text-sm text-gray-500">Stalls</div>
-            <div className="text-2xl font-bold text-yellow-400">0</div>
+            <div className="text-sm text-gray-500">Branch Misprediction Rate</div>
+            <div className="text-2xl font-bold text-red-400">{cpu?.getBranchMispredictionRate().toFixed(2)}%</div>
           </div>
         </div>
       </div>
