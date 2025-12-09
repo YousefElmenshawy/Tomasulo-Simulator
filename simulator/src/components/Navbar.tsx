@@ -15,6 +15,12 @@ export default function NavBar({ children }:{children:React.ReactNode}) {
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [programText, setProgramText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [startingAddress, setStartingAddress] = useState('0');
+  const [dataMemory, setDataMemory] = useState<Array<{address: string, value: string}>>([
+    { address: '0', value: '0' },
+    { address: '34', value: '0' },
+    { address: '45', value: '0' },
+  ]);
 
   const availableInstructions = [
     'LOAD', 'STORE', 'ADD', 'SUB', 'MUL', 'NAND','BEQ','CALL','RET'   // to be changed
@@ -32,6 +38,20 @@ export default function NavBar({ children }:{children:React.ReactNode}) {
     }]);
   };
 
+  const addDataMemory = () => {
+    setDataMemory([...dataMemory, { address: '0', value: '0' }]);
+  };
+
+  const removeDataMemory = (index: number) => {
+    setDataMemory(dataMemory.filter((_, i) => i !== index));
+  };
+
+  const updateDataMemory = (index: number, field: 'address' | 'value', value: string) => {
+    const updated = [...dataMemory];
+    updated[index][field] = value;
+    setDataMemory(updated);
+  };
+
   const removeInstruction = (index: number) => {
    setInstructions(instructions.filter((_, i) => i !== index)); 
   };
@@ -45,11 +65,18 @@ const updated = [...instructions];
   const loadProgram = () => {
     const handleProgramLoad = (window as any).simulatorHandlers?.handleProgramLoad;
     
+    // Parse starting address and data memory
+    const startAddr = parseInt(startingAddress) || 0;
+    const memData: Array<[number, number]> = dataMemory.map(item => [
+      parseInt(item.address) || 0,
+      parseFloat(item.value) || 0
+    ]);
+    
     if (loadMode === 'text') {
       // Parse text program
       const lines = programText.trim().split('\n').filter(line => line.trim() !== '');
       if (lines.length > 0 && handleProgramLoad) {
-        handleProgramLoad(lines);
+        handleProgramLoad(lines, startAddr, memData);
         setShowLoadModal(false);
       }
     } else if (loadMode === 'file' && selectedFile) {
@@ -59,7 +86,7 @@ const updated = [...instructions];
         const content = e.target?.result as string;
         const lines = content.trim().split('\n').filter(line => line.trim() !== '');
         if (lines.length > 0 && handleProgramLoad) {
-          handleProgramLoad(lines);
+          handleProgramLoad(lines, startAddr, memData);
           setShowLoadModal(false);
           setSelectedFile(null);
         }
@@ -84,7 +111,7 @@ const updated = [...instructions];
         }
       });
       if (programLines.length > 0 && handleProgramLoad) {
-        handleProgramLoad(programLines);
+        handleProgramLoad(programLines, startAddr, memData);
         setShowLoadModal(false);
       }
     }
@@ -244,6 +271,66 @@ const updated = [...instructions];
 
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-6">
+              {/* Starting Address and Data Memory - Common for all modes */}
+              <div className="mb-6 space-y-4 pb-6 border-b border-zinc-800">
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Starting Address (PC)
+                  </label>
+                  <input
+                    type="number"
+                    value={startingAddress}
+                    onChange={(e) => setStartingAddress(e.target.value)}
+                    className="w-full bg-zinc-800 text-gray-100 px-4 py-2 rounded-lg border border-zinc-700 focus:border-blue-500 focus:outline-none"
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+                
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-gray-300 text-sm font-medium">
+                      Data Memory (16-bit values)
+                    </label>
+                    <button
+                      onClick={addDataMemory}
+                      className="flex items-center gap-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-blue-400 text-xs rounded transition-colors"
+                    >
+                      <Plus size={14} />
+                      Add
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {dataMemory.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-zinc-800 p-3 rounded-lg">
+                        <span className="text-gray-500 text-sm">Address:</span>
+                        <input
+                          type="number"
+                          value={item.address}
+                          onChange={(e) => updateDataMemory(idx, 'address', e.target.value)}
+                          className="bg-zinc-700 text-gray-100 px-3 py-1 rounded border border-zinc-600 focus:border-blue-500 focus:outline-none w-24"
+                          placeholder="0"
+                        />
+                        <span className="text-gray-500 text-sm">Value:</span>
+                        <input
+                          type="number"
+                          value={item.value}
+                          onChange={(e) => updateDataMemory(idx, 'value', e.target.value)}
+                          className="bg-zinc-700 text-gray-100 px-3 py-1 rounded border border-zinc-600 focus:border-blue-500 focus:outline-none flex-1"
+                          placeholder="0"
+                        />
+                        <button
+                          onClick={() => removeDataMemory(idx)}
+                          className="p-1 hover:bg-red-900/30 text-red-400 rounded transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {loadMode === 'builder' ? (
                 <div className="space-y-4">
                   {instructions.map((inst, idx) => (

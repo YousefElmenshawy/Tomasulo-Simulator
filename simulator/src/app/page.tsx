@@ -20,6 +20,15 @@ export default function Home() {
   const [cpu, setCpu] = useState<CPU | null>(null);
   const [, forceUpdate] = useState(0);
   
+  // Store starting address and memory data
+  const [startingAddress, setStartingAddress] = useState(0);
+  const [memoryData, setMemoryData] = useState<Array<[number, number]>>([
+    [0, 5],
+    [34, 10],
+    [45, 0],
+    [50, 3.0],
+    [100, 4.2],
+  ]);
 
   const [programStrings, setProgramStrings] = useState([
     "LOAD R2, 0(R0)",      // PC=0: Load value 5 into R2
@@ -38,19 +47,11 @@ export default function Home() {
 
   // Initialize CPU
   useEffect(() => {
-    const memData: Array<[number, number]> = [
-      [0, 5],
-      [34, 10],
-      [45, 0],
-      [50, 3.0],
-      [100, 4.2],
-    ];
-    
-    const cpuInstance = new CPU(0, memData, programStrings);
+    const cpuInstance = new CPU(startingAddress, memoryData, programStrings);
     setCpu(cpuInstance);
     // Force a re-render after CPU is initialized
     forceUpdate(prev => prev + 1);
-  }, [programStrings]);
+  }, [programStrings, startingAddress, memoryData]);
 
   const handleStep = useCallback(() => {
     if (cpu) {
@@ -70,23 +71,21 @@ export default function Home() {
     // Reset all shared state first
     resetSimulator();
     
-    const memData: Array<[number, number]> = [
-      [0, 5],
-      [34, 10],
-      [45, 0],
-      [50, 3.0],
-      [100, 4.2],
-    ];
-    
-    
-    const cpuInstance = new CPU(0, memData, programStrings);
+    const cpuInstance = new CPU(startingAddress, memoryData, programStrings);
     setCpu(cpuInstance);
     forceUpdate(prev => prev + 1);
-  }, [programStrings]);
+  }, [programStrings, startingAddress, memoryData]);
 
   // Handler for loading a new program
-  const handleProgramLoad = useCallback((newProgramStrings: string[]) => {
+  const handleProgramLoad = useCallback((newProgramStrings: string[], startAddr: number = 0, memData: Array<[number, number]> = [[0, 5], [34, 10], [45, 0], [50, 3.0], [100, 4.2]]) => {
     setProgramStrings(newProgramStrings);
+    setStartingAddress(startAddr);
+    setMemoryData(memData);
+    // Reset and create new CPU with new data
+    resetSimulator();
+    const cpuInstance = new CPU(startAddr, memData, newProgramStrings);
+    setCpu(cpuInstance);
+    forceUpdate(prev => prev + 1);
   }, []);
 
   // Expose handlers to window for Navbar to access
