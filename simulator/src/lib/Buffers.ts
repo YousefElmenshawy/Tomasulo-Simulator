@@ -185,6 +185,8 @@ export const getInstructionCount = () => InstructionCounter.value; // Number of 
 
 export let IQ:Array<Instruction> = []; // Instruction Queue to be filled Later
 
+export let Actual_IQ: Array<Instruction> = [];
+
 // Reset function to clear all state
 export function resetSimulator(): void {
   // Reset registers
@@ -231,8 +233,13 @@ export function resetSimulator(): void {
   
   // Clear instruction queue
   IQ = [];
+  
+  // Clear actual instruction queue
+  Actual_IQ = [];
 
   // Reset ROB number of entries
+  ROBCount = 0;
 
-  ROBCount =0;
+  // set the LastCycle
+
 }

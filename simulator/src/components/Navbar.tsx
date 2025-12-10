@@ -9,7 +9,7 @@ interface Instruction { // will be changed
   src2: string;
 }
 
-export default function NavBar({ children }:{children:React.ReactNode}) {
+export default function NavBar({ children,Done=-1 }:{children:React.ReactNode, Done:number}) {
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [loadMode, setLoadMode] = useState('builder'); // 'builder', 'text', or 'file'
   const [instructions, setInstructions] = useState<Instruction[]>([]);
@@ -149,7 +149,12 @@ const updated = [...instructions];
               <div className="relative group">
                 <button 
                   onClick={() => (window as any).simulatorHandlers?.handleRun()}
-                  className="p-3 hover:bg-zinc-800 text-green-500 rounded transition-all"
+                  disabled={Done!==-1}
+                  className={`p-3 rounded transition-all ${
+                      Done !== -1
+                        ? 'text-gray-600 cursor-not-allowed opacity-50'
+                        : 'hover:bg-zinc-800 text-blue-400'
+                    }`}
                 >
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M4.5 3v10l8-5-8-5z"/>
@@ -164,7 +169,12 @@ const updated = [...instructions];
               <div className="relative group">
                 <button 
                   onClick={() => (window as any).simulatorHandlers?.handleStep()}
-                  className="p-3 hover:bg-zinc-800 text-blue-400 rounded transition-all"
+                  disabled = {Done!==-1}
+                   className={`p-3 rounded transition-all ${
+                      Done !== -1
+                        ? 'text-gray-600 cursor-not-allowed opacity-50'
+                        : 'hover:bg-zinc-800 text-blue-400'
+                    }`}
                 >
                   <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M2 3v10l7-5-7-5zm7 0v10l7-5-7-5z"/>

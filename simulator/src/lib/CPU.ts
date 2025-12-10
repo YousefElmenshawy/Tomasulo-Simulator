@@ -1,10 +1,11 @@
-import {RF,RegistersTable,reservationStations,IQ,InstructionCounter,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter, CMDB, enqueueCDB, dequeueCDB,FlushROB,DequeueROB,ROBCount,ROB_Size,ROB_Head,ROB_Tail}from "./Buffers"
+import {RF,RegistersTable,reservationStations,IQ,InstructionCounter,MemoryViewer,ROB,ROBEntry,allocateROB,CycleCounter, CMDB, enqueueCDB, dequeueCDB,FlushROB,DequeueROB,ROBCount,ROB_Size,ROB_Head,ROB_Tail, Actual_IQ}from "./Buffers"
 import { Instruction,decodeInst } from "./Instructions";
 
 
     
 export class CPU
 {
+public EndProgram  :number|undefined = 0;  
 private  PC:number = 0;
 private Memory:Int32Array = MemoryViewer; 
 private Registers = RF;
@@ -22,7 +23,8 @@ private ReOrderBuffer = ROB;
 private CommonDataBus = CMDB;
 private branchCount = 0;
 private branchMispredictions = 0;
-private IC = InstructionCounter
+private IC = InstructionCounter;
+private Actuall_IQ = Actual_IQ;
 
 // Helper to be used 
 
@@ -121,6 +123,17 @@ public getPC(): number {
     return this.PC;
 }
 
+// Helper to load instruction queue from current PC
+private loadInstructionQueue(): void {
+    Actual_IQ.length = 0; // Clear the queue
+    // Fill with instructions starting from current PC
+    for (let i = this.PC; i < this.Instructions.length; i++) {
+        if (this.Instructions[i]) {
+            Actual_IQ.push(this.Instructions[i]);
+        }
+    }
+}
+
 // Getter for branch misprediction percentage
 public getBranchMispredictionRate(): number {
     if (this.branchCount === 0) return 0;
@@ -128,7 +141,7 @@ public getBranchMispredictionRate(): number {
 }
 
 constructor(InstAddress:number ,Memdata: Array<[number,number]>, program: Array<string> ){ // Inputs DataMemory and Starting Address
-
+this.EndProgram = -1;
 this.PC = InstAddress;
 for ( let i = 0; i<Memdata.length; i++) //Filling Data Memory
 {
@@ -142,16 +155,18 @@ for(let i = 0; i<program.length;i++)  //filling the program Instructions
 this.Instructions[i] = decodeInst(program[i]);
 }
 
+// Initialize instruction queue from starting address
+this.loadInstructionQueue();
+
 
 }
 
 private issue(inst: Instruction): void {
-         
-
+    // Issue instruction from the front of Actual_IQ
+    // The inst parameter should match the front of the queue
    
     if (!inst) return;
 
-    
     // Check if already issued
     if (inst.issueCycle !== undefined) return;
 
@@ -462,7 +477,12 @@ else if (inst.opcode === "CALL") {
    
     // 7. Mark issue cycle
     inst.issueCycle = CycleCounter.value;
-    this.PC = this.PC + 1 ;
+    this.PC = this.PC + 1;
+    
+    // Dequeue from Actual_IQ (remove the issued instruction)
+    if (Actual_IQ.length > 0 && Actual_IQ[0] === inst) {
+        Actual_IQ.shift();
+    }
 }
 
 
@@ -873,6 +893,9 @@ private commit(): void {
             
             // Clear CMDB queue since all flushed instructions are invalid
             this.CommonDataBus.length = 0;
+            
+            // Reload instruction queue from new PC
+            this.loadInstructionQueue();
 
         }
         // If not taken, PC already correct (incremented normally)
@@ -943,6 +966,9 @@ private commit(): void {
         
         // Update PC to call target (computed in execute)
         this.PC = robEntry.targetPC ?? 0;
+        
+        // Reload instruction queue from new PC
+        this.loadInstructionQueue();
     }
     // Handle RET: update PC to return address and flush speculative instructions
     else if (inst.opcode === "RET") {
@@ -1011,6 +1037,9 @@ private commit(): void {
         }
         
         this.PC = robEntry.value ?? 0;
+        
+        // Reload instruction queue from new PC
+        this.loadInstructionQueue();
 
     }
     // Normal register write for other instructions
@@ -1077,7 +1106,27 @@ private commit(): void {
 step(): void {
     // One cycle - process all instructions in proper order
     // Order: Commit -> Write -> Execute -> Issue (reverse pipeline order)
-    
+    const allDone = () => {
+        // Check if all instructions have been issued
+        const allIssued = this.PC >= this.Instructions.length;
+        
+        // Check if ROB is empty (all committed) using circular buffer count
+        const robEmpty = ROBCount === 0;
+        
+        // Done when all instructions issued AND ROB is empty
+        return allIssued && robEmpty;
+    };
+
+    if (allDone())
+    {
+
+
+        this.EndProgram =CycleCounter.value;
+        return;
+    }
+
+
+
     // 1. COMMIT - Try to commit the head of ROB (in-order)
     if (ROBCount > 0) {
         const headROB = this.ReOrderBuffer[ROB_Head];
@@ -1107,11 +1156,12 @@ step(): void {
         }
     }
     
-    // 4. ISSUE - Issue the instruction at PC (if not already issued)
-    const currentInst = this.Instructions[Math.floor(this.PC)];
-    if (currentInst && currentInst.issueCycle === undefined) {
-
-        this.issue(currentInst);
+    // 4. ISSUE - Issue the instruction from front of Actual_IQ (if not already issued)
+    if (Actual_IQ.length > 0) {
+        const currentInst = Actual_IQ[0];
+        if (currentInst && currentInst.issueCycle === undefined) {
+            this.issue(currentInst);
+        }
     }
     
     CycleCounter.value++;
@@ -1144,6 +1194,8 @@ step(): void {
         cycleCount++;
     }
     
+
+    this.EndProgram = cycleCount;
     // Warning if we hit the cycle limit
     if (cycleCount >= MAX_CYCLES) {
         console.warn(`Reached maximum cycle limit (${MAX_CYCLES}). Possible infinite loop.`);

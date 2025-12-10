@@ -1,8 +1,8 @@
 'use client';
 import Image from "next/image";
-// AI prompt(Claude) : Generate the Home page for a tomosulo algorithm Simulator 
+// AI prompt(Claude) : Generate the Home page UI (return HTML function ) for a tomosulo algorithm Simulator 
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Children } from 'react';
 import { CPU } from '@/lib/CPU';
 import { 
   RF, 
@@ -15,6 +15,7 @@ import {
   InstructionCounter,
   resetSimulator
 } from '@/lib/Buffers';
+import NavBar from "@/components/Navbar";
 
 export default function Home() {
   const [cpu, setCpu] = useState<CPU | null>(null);
@@ -29,6 +30,8 @@ export default function Home() {
     [50, 3.0],
     [100, 4.2],
   ]);
+
+  const Done = cpu?.EndProgram ?? -1;
 
   const [programStrings, setProgramStrings] = useState([
     "LOAD R2, 0(R0)",      // PC=0: Load value 5 into R2
@@ -55,6 +58,7 @@ export default function Home() {
 
   const handleStep = useCallback(() => {
     if (cpu) {
+      if(cpu.EndProgram===-1)
       cpu.step();
       forceUpdate(prev => prev + 1);
     }
@@ -144,6 +148,7 @@ export default function Home() {
     }
     
     return {
+    
       inst: instStr,
       dest,
       src1,
@@ -289,8 +294,10 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 p-6">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <>
+      <NavBar Done={Done}>
+        <div className="min-h-screen bg-black text-gray-100 p-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Reorder Buffer (ROB) */}
         <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
@@ -321,7 +328,7 @@ export default function Home() {
               </tbody>
             </table>
           </div>
-          
+
         </div>
 
 
@@ -661,6 +668,8 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </NavBar>
+    </>
   );
 }
