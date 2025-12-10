@@ -39,6 +39,11 @@ export const MemoryViewer = new Int32Array(Memory).fill(0); // Word Addressable
   BEQ: Array(2).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, vk: null as number | null, qj: null as number | null, qk: null as number | null, addr: null as number | null, dest: '', qi: null as number | null })),
   CALL_RET: Array(1).fill(null).map(() => ({ busy: false, op: '', vj: null as number | null, qj: null as number | null, addr: null as number | null, dest: '', qi: null as number | null }))
 };
+
+export let ROBCount =0;
+export const ROB_Size = 8;
+export let ROB_Head = 0;
+export let ROB_Tail = 0;
 export interface ROBEntry {
   busy: boolean
   instruction: Instruction | null
@@ -52,7 +57,7 @@ export interface ROBEntry {
   
 }
 
-export let ROB: ROBEntry[] = Array(80000).fill(null).map(() => ({
+export let ROB: ROBEntry[] = Array(ROB_Size).fill(null).map(() => ({
   busy: false,
   instruction: null,
   destReg: null,
@@ -64,14 +69,75 @@ export let ROB: ROBEntry[] = Array(80000).fill(null).map(() => ({
   addr:0
 }));
 
+export function DequeueROB(): ROBEntry | null {
+if(ROBCount ===0)
+{
+
+return null; // ROB is empty
+
+}
+const entry = ROB[ROB_Head];
+
+entry.busy = false;
+entry.instruction = null;
+entry.destReg = null;
+entry.value = null;
+entry.ready = false;
+entry.BranchPC = -1;
+entry.BranchTaken = false;
+entry.targetPC = 0;
+entry.addr = 0;
+
+// update Head Pointer
+
+ROB_Head = (ROB_Head +1)%ROB_Size;
+
+ROBCount--; // update number of entries
+
+return entry;
+
+}
+
+
+export function FlushROB():void{ // for BEQ, CALL, RET
+for(let i = 0;i<ROB_Size; i++)
+
+
+  {
+if (i !== ROB_Head && ROB[i].busy) {
+      ROB[i].busy = false;
+      ROB[i].instruction = null;
+      ROB[i].destReg = null;
+      ROB[i].value = null;
+      ROB[i].ready = false;
+      ROB[i].BranchPC = 0;
+      ROB[i].BranchTaken = false;
+      ROB[i].targetPC = 0;
+      ROB[i].addr = 0;
+    }
+
+  }
+
+ // Reset tail to right after head, count to 1 (only head remains)
+  ROB_Tail = (ROB_Head + 1) % ROB_Size;
+  ROBCount = ROB[ROB_Head].busy ? 1 : 0;
+
+
+}
+
 // ROB helper function
 
 // Allocate a free ROB entry for an instruction
 export function allocateROB(inst: Instruction): number {
   
-    for (let i = 0; i < ROB.length; i++) {
+
+
+    if(ROBCount>=ROB_Size)
+      return -1; // ROB is full
+
+    const i = ROB_Tail;
+    const ROB_entry = ROB[i];
       
-        if (!ROB[i].busy) {
             ROB[i].busy = true;
             ROB[i].instruction = inst;
             ROB[i].ready = false;
@@ -81,13 +147,13 @@ export function allocateROB(inst: Instruction): number {
             ROB[i].BranchPC=0;
             ROB[i].targetPC=0;
             ROB[i].BranchTaken = false;
-            
-            
-
-            return i;
-        }
-    }
-    return -1; // ROB full
+     // update ROB tail pointer
+     
+     ROB_Tail =(ROB_Tail+1)% ROB_Size;
+     ROBCount ++; // update number of entries
+          
+     return i;  
+   
 }
 
 
@@ -142,7 +208,7 @@ export function resetSimulator(): void {
   };
   
   // Recreate ROB from scratch
-  ROB = Array(800000).fill(null).map(() => ({
+  ROB = Array(ROB_Size).fill(null).map(() => ({
     busy: false,
     instruction: null,
     destReg: null,
@@ -153,6 +219,8 @@ export function resetSimulator(): void {
     targetPC: 0,
     addr: 0
   }));
+  ROB_Head =0;
+  ROB_Tail = 0;
   
   // Reset counters
   CycleCounter.value = 1;
@@ -163,4 +231,8 @@ export function resetSimulator(): void {
   
   // Clear instruction queue
   IQ = [];
+
+  // Reset ROB number of entries
+
+  ROBCount =0;
 }
