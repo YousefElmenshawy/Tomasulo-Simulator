@@ -533,27 +533,44 @@ private execute(inst: Instruction): void {
 
 
     // Check if operands are ready
-
-
-    const InROB = (robTag: number | null): boolean => { //helper func to ease next part
-    if (robTag === null || robTag === undefined) return false;
     
-    const robEntryN = this.ReOrderBuffer[robTag];
-    const exists = robEntryN !== null && robEntryN !== undefined;
-    const ready = exists && robEntryN.ready === true;
-    return ready;  //to differentiate between robEntry
-}
+    // Helper function to check if a ROB entry is ready OR has been committed
+    // Only checks ROB entries that are BEFORE the current instruction (older)
+    const operandReady = (robTag: number | null): boolean => {
+        if (robTag === null || robTag === undefined) return true; // No dependency
+        
+        const robEntryN = this.ReOrderBuffer[robTag];
+        
+        // If ROB entry doesn't exist or is not busy, it has been committed
+        // In this case, the value is in the register file
+        if (!robEntryN || !robEntryN.busy) return true;
+        
+        // Check if this ROB entry is BEFORE the current instruction in program order
+        // In a circular buffer, we need to check if robTag comes before robIndex
+        // If robTag is after robIndex, then it's a dependency on a future instruction (impossible!)
+        // In that case, treat it as if the value is in the register file
+        const isBeforeCurrent = ((robTag - ROB_Head + ROB_Size) % ROB_Size) < 
+                                ((robIndex - ROB_Head + ROB_Size) % ROB_Size);
+        
+        if (!isBeforeCurrent) {
+            // This ROB entry is AFTER the current instruction, so we should read from register file
+            return true;
+        }
+        
+        // If ROB entry exists, is busy, and is before current instruction, check if it's ready
+        return robEntryN.ready === true;
+    };
 
+    const operandsReady = operandReady(rs.qj) && operandReady(rs.qk);
 
-    const operandsReady = (rs.qj === null || rs.qj === undefined || InROB(rs.qj)) && 
-                      (rs.qk === null || rs.qk === undefined || InROB(rs.qk));
-
-if (!operandsReady) return; // Wait for operands
+    if (!operandsReady) return; // Wait for operands
 
 // If we reach here, update values from ROB if needed, or refresh from register file
 if (rs.qj !== null && rs.qj !== undefined) {
-    if (InROB(rs.qj)) {
-        rs.vj = this.ReOrderBuffer[rs.qj].value ?? 0;
+    const qjROB = this.ReOrderBuffer[rs.qj];
+    if (qjROB && qjROB.busy && qjROB.ready) {
+        // ROB entry is still in ROB and ready
+        rs.vj = qjROB.value ?? 0;
         rs.qj = null;
     } else {
         // ROB entry was committed, read from register file
@@ -599,8 +616,10 @@ if (rs.qj !== null && rs.qj !== undefined) {
 }
 
 if (rs.qk !== null && rs.qk !== undefined) {
-    if (InROB(rs.qk)) {
-        rs.vk = this.ReOrderBuffer[rs.qk].value ?? 0;
+    const qkROB = this.ReOrderBuffer[rs.qk];
+    if (qkROB && qkROB.busy && qkROB.ready) {
+        // ROB entry is still in ROB and ready
+        rs.vk = qkROB.value ?? 0;
         rs.qk = null;
     } else {
         // ROB entry was committed, read from register file

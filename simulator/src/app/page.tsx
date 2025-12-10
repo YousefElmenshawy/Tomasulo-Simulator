@@ -284,390 +284,385 @@ export default function Home() {
     };
   });
 
-  // Map memory values
-  const memory: Record<number, number> = {
-    0: MemoryViewer[0],
-    34: MemoryViewer[34],
-    45: MemoryViewer[45],
-    50: MemoryViewer[50],
-    100: MemoryViewer[100],
+  // Memory address selection state
+  const [selectedMemAddrs, setSelectedMemAddrs] = useState([0, 34, 45, 50, 100]);
+  const handleMemAddrChange = (idx: number, value: number) => {
+    const newAddrs = [...selectedMemAddrs];
+    newAddrs[idx] = value;
+    setSelectedMemAddrs(newAddrs);
   };
+  // Only show selected memory addresses
+  const memory: Record<number, number> = {};
+  selectedMemAddrs.forEach(addr => {
+    memory[addr] = MemoryViewer[addr] ?? 0;
+  });
 
   return (
     <>
       <NavBar Done={Done}>
         <div className="min-h-screen bg-black text-gray-100 p-6">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-7 gap-6">
+            {/* Register File (Values) - Sidebar */}
+            <div className="col-span-1 flex flex-col gap-3">
+              <h2 className="text-lg font-semibold mb-2 text-gray-200">Register File</h2>
+              {Object.entries(registerFile).map(([reg, value]) => (
+                <div key={reg} className="bg-zinc-800 rounded p-2">
+                  <div className="text-xs text-gray-500">{reg}</div>
+                  <div className="font-mono text-sm text-green-400">{value.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
 
-        {/* Reorder Buffer (ROB) */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-3 text-gray-200">ROB</h2>
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-zinc-900">
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Entry</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Inst</th>
-                  <th className="text-left p-2 text-gray-400">Dest</th>
-                  <th className="text-left p-2 text-gray-400">Val</th>
-                  <th className="text-left p-2 text-gray-400">Rdy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {robEntries.map((entry, idx) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${entry.busy ? 'bg-purple-950/30' : ''}`}>
-                    <td className="p-2 font-mono text-purple-400">ROB{entry.index}</td>
-                    <td className="p-2">{entry.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{entry.instruction}</td>
-                    <td className="p-2">{entry.destReg}</td>
-                    <td className="p-2">{entry.value}</td>
-                    <td className="p-2">{entry.ready ? '✓' : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-
-
-        {/* Current Cycle Display */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-3 text-gray-200">Current Cycle</h2>
-          <div className="flex items-center justify-center h-full">
-            <div className="text-6xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
-          </div>
-        </div>
-
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-3 text-gray-200">PC</h2>
-          <div className="flex items-center justify-center h-full">
-            <div className="text-6xl font-bold text-blue-400">{Math.max(0, (cpu?.getPC() ?? 0) - 1)}</div>
-          </div>
-        </div>
-
-        {/* Instruction Status */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Instruction Status</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Instruction</th>
-                  <th className="text-left p-2 text-gray-400">Dest</th>
-                  <th className="text-left p-2 text-gray-400">Src1</th>
-                  <th className="text-left p-2 text-gray-400">Src2</th>
-                  <th className="text-left p-2 text-gray-400">Issue</th>
-                  <th className="text-left p-2 text-gray-400">Exec</th>
-                  <th className="text-left p-2 text-gray-400">Write</th>
-                  <th className="text-left p-2 text-gray-400">Commit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {program.map((inst, idx) => (
-                  <tr key={idx} className="border-b border-zinc-800 hover:bg-zinc-800/50">
-                    <td className="p-2 font-mono text-blue-400">{inst.inst}</td>
-                    <td className="p-2">{inst.dest}</td>
-                    <td className="p-2">{inst.src1}</td>
-                    <td className="p-2">{inst.src2}</td>
-                    <td className="p-2">{inst.issue || '-'}</td>
-                    <td className="p-2">{inst.exec || '-'}</td>
-                    <td className="p-2">{inst.write || '-'}</td>
-                    <td className="p-2">{inst.commit || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Register Status */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Register Status Table</h2>
-          <div className="grid grid-cols-4 gap-3">
-            {Object.entries(registerStatus).map(([reg, station]) => (
-              <div key={reg} className="bg-zinc-800 rounded p-3">
-                <div className="text-xs text-gray-500 mb-1">{reg}</div>
-                <div className="font-mono text-sm text-gray-300">{station || 'Free'}</div>
+            {/* Main Area: Everything except Register File and PC/Cycle */}
+            <div className="col-span-5 flex flex-col gap-6">
+              {/* ROB */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-3 text-gray-200">ROB</h2>
+                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-zinc-900">
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Entry</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Inst</th>
+                        <th className="text-left p-2 text-gray-400">Dest</th>
+                        <th className="text-left p-2 text-gray-400">Val</th>
+                        <th className="text-left p-2 text-gray-400">Rdy</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {robEntries.map((entry, idx) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${entry.busy ? 'bg-purple-950/30' : ''}`}>
+                          <td className="p-2 font-mono text-purple-400">ROB{entry.index}</td>
+                          <td className="p-2">{entry.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{entry.instruction}</td>
+                          <td className="p-2">{entry.destReg}</td>
+                          <td className="p-2">{entry.value}</td>
+                          <td className="p-2">{entry.ready ? '✓' : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Reservation Stations - Add/Sub */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Add/Sub Reservation Stations</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Vj</th>
-                  <th className="text-left p-2 text-gray-400">Vk</th>
-                  <th className="text-left p-2 text-gray-400">Qj</th>
-                  <th className="text-left p-2 text-gray-400">Qk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.add.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.vj || '-'}</td>
-                    <td className="p-2">{rs.vk || '-'}</td>
-                    <td className="p-2">{rs.qj || '-'}</td>
-                    <td className="p-2">{rs.qk || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Reservation Stations - Mult/Div */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Mult/Div Reservation Stations</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Vj</th>
-                  <th className="text-left p-2 text-gray-400">Vk</th>
-                  <th className="text-left p-2 text-gray-400">Qj</th>
-                  <th className="text-left p-2 text-gray-400">Qk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.mult.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.vj || '-'}</td>
-                    <td className="p-2">{rs.vk || '-'}</td>
-                    <td className="p-2">{rs.qj || '-'}</td>
-                    <td className="p-2">{rs.qk || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Load Buffers */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Load Buffers</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Address</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.load.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.addr || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Store Buffers */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Store Buffers</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Vj</th>
-                  <th className="text-left p-2 text-gray-400">Vk</th>
-                  <th className="text-left p-2 text-gray-400">Qj</th>
-                  <th className="text-left p-2 text-gray-400">Qk</th>
-                  <th className="text-left p-2 text-gray-400">Addr</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.store.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.vj || '-'}</td>
-                    <td className="p-2">{rs.vk || '-'}</td>
-                    <td className="p-2">{rs.qj || '-'}</td>
-                    <td className="p-2">{rs.qk || '-'}</td>
-                    <td className="p-2">{rs.addr || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* NAND Reservation Stations */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">NAND Reservation Stations</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Vj</th>
-                  <th className="text-left p-2 text-gray-400">Vk</th>
-                  <th className="text-left p-2 text-gray-400">Qj</th>
-                  <th className="text-left p-2 text-gray-400">Qk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.nand.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.vj || '-'}</td>
-                    <td className="p-2">{rs.vk || '-'}</td>
-                    <td className="p-2">{rs.qj || '-'}</td>
-                    <td className="p-2">{rs.qk || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* BEQ Reservation Stations */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">BEQ Reservation Stations</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                  <th className="text-left p-2 text-gray-400">Vj</th>
-                  <th className="text-left p-2 text-gray-400">Vk</th>
-                  <th className="text-left p-2 text-gray-400">Qj</th>
-                  <th className="text-left p-2 text-gray-400">Qk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.beq.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                    <td className="p-2">{rs.vj || '-'}</td>
-                    <td className="p-2">{rs.vk || '-'}</td>
-                    <td className="p-2">{rs.qj || '-'}</td>
-                    <td className="p-2">{rs.qk || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* CALL/RET Reservation Stations */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">CALL/RET Reservation Stations</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-700">
-                  <th className="text-left p-2 text-gray-400">Name</th>
-                  <th className="text-left p-2 text-gray-400">Busy</th>
-                  <th className="text-left p-2 text-gray-400">Op</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservationStationsUI.callRet.map((rs: any, idx: number) => (
-                  <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
-                    <td className="p-2 font-mono">{rs.name}</td>
-                    <td className="p-2">{rs.busy ? '✓' : '-'}</td>
-                    <td className="p-2">{rs.op || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-
-        {/* Register File */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Register File (Values)</h2>
-          <div className="grid grid-cols-4 gap-3">
-            {Object.entries(registerFile).map(([reg, value]) => (
-              <div key={reg} className="bg-zinc-800 rounded p-3">
-                <div className="text-xs text-gray-500 mb-1">{reg}</div>
-                <div className="font-mono text-sm text-green-400">{value.toFixed(2)}</div>
+              {/* Instruction Status */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Instruction Status</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Instruction</th>
+                        <th className="text-left p-2 text-gray-400">Dest</th>
+                        <th className="text-left p-2 text-gray-400">Src1</th>
+                        <th className="text-left p-2 text-gray-400">Src2</th>
+                        <th className="text-left p-2 text-gray-400">Issue</th>
+                        <th className="text-left p-2 text-gray-400">Exec</th>
+                        <th className="text-left p-2 text-gray-400">Write</th>
+                        <th className="text-left p-2 text-gray-400">Commit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {program.map((inst, idx) => (
+                        <tr key={idx} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                          <td className="p-2 font-mono text-blue-400">{inst.inst}</td>
+                          <td className="p-2">{inst.dest}</td>
+                          <td className="p-2">{inst.src1}</td>
+                          <td className="p-2">{inst.src2}</td>
+                          <td className="p-2">{inst.issue || '-'}</td>
+                          <td className="p-2">{inst.exec || '-'}</td>
+                          <td className="p-2">{inst.write || '-'}</td>
+                          <td className="p-2">{inst.commit || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Memory */}
-        <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800 lg:col-span-2">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Memory</h2>
-          <div className="grid grid-cols-5 gap-3">
-            {Object.entries(memory).map(([addr, value]) => (
-              <div key={addr} className="bg-zinc-800 rounded p-3">
-                <div className="text-xs text-gray-500 mb-1">Mem[{addr}]</div>
-                <div className="font-mono text-sm text-blue-400">{value.toFixed(2)}</div>
+              {/* Reservation Stations - Add/Sub */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Add/Sub Reservation Stations</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Vj</th>
+                        <th className="text-left p-2 text-gray-400">Vk</th>
+                        <th className="text-left p-2 text-gray-400">Qj</th>
+                        <th className="text-left p-2 text-gray-400">Qk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.add.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.vj || '-'}</td>
+                          <td className="p-2">{rs.vk || '-'}</td>
+                          <td className="p-2">{rs.qj || '-'}</td>
+                          <td className="p-2">{rs.qk || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Performance Metrics */}
-      <div className="max-w-7xl mx-auto mt-6 bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-        <h2 className="text-xl font-semibold mb-4 text-gray-200">Performance Metrics</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-zinc-800 rounded p-4">
-            <div className="text-sm text-gray-500">Total Cycles</div>
-            <div className="text-2xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
-          </div>
-          <div className="bg-zinc-800 rounded p-4">
-            <div className="text-sm text-gray-500">Instructions Completed</div>
-            <div className="text-2xl font-bold text-green-400">{InstructionCounter.value}</div>
-          </div>
-          <div className="bg-zinc-800 rounded p-4">
-            <div className="text-sm text-gray-500">IPC</div>
-            <div className="text-2xl font-bold text-purple-400">
-              {(InstructionCounter.value / Math.max(1, CycleCounter.value - 1)).toFixed(2)}
+              {/* Reservation Stations - Mult/Div */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Mult/Div Reservation Stations</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Vj</th>
+                        <th className="text-left p-2 text-gray-400">Vk</th>
+                        <th className="text-left p-2 text-gray-400">Qj</th>
+                        <th className="text-left p-2 text-gray-400">Qk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.mult.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.vj || '-'}</td>
+                          <td className="p-2">{rs.vk || '-'}</td>
+                          <td className="p-2">{rs.qj || '-'}</td>
+                          <td className="p-2">{rs.qk || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Load Buffers */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Load Buffers</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.load.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.addr || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Store Buffers */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Store Buffers</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Vj</th>
+                        <th className="text-left p-2 text-gray-400">Vk</th>
+                        <th className="text-left p-2 text-gray-400">Qj</th>
+                        <th className="text-left p-2 text-gray-400">Qk</th>
+                        <th className="text-left p-2 text-gray-400">Addr</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.store.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.vj || '-'}</td>
+                          <td className="p-2">{rs.vk || '-'}</td>
+                          <td className="p-2">{rs.qj || '-'}</td>
+                          <td className="p-2">{rs.qk || '-'}</td>
+                          <td className="p-2">{rs.addr || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* NAND Reservation Stations */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">NAND Reservation Stations</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Vj</th>
+                        <th className="text-left p-2 text-gray-400">Vk</th>
+                        <th className="text-left p-2 text-gray-400">Qj</th>
+                        <th className="text-left p-2 text-gray-400">Qk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.nand.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.vj || '-'}</td>
+                          <td className="p-2">{rs.vk || '-'}</td>
+                          <td className="p-2">{rs.qj || '-'}</td>
+                          <td className="p-2">{rs.qk || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* BEQ Reservation Stations */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">BEQ Reservation Stations</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                        <th className="text-left p-2 text-gray-400">Vj</th>
+                        <th className="text-left p-2 text-gray-400">Vk</th>
+                        <th className="text-left p-2 text-gray-400">Qj</th>
+                        <th className="text-left p-2 text-gray-400">Qk</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.beq.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                          <td className="p-2">{rs.vj || '-'}</td>
+                          <td className="p-2">{rs.vk || '-'}</td>
+                          <td className="p-2">{rs.qj || '-'}</td>
+                          <td className="p-2">{rs.qk || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* CALL/RET Reservation Stations */}
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">CALL/RET Reservation Stations</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left p-2 text-gray-400">Name</th>
+                        <th className="text-left p-2 text-gray-400">Busy</th>
+                        <th className="text-left p-2 text-gray-400">Op</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservationStationsUI.callRet.map((rs: any, idx: number) => (
+                        <tr key={idx} className={`border-b border-zinc-800 ${rs.busy ? 'bg-green-950/30' : ''}`}>
+                          <td className="p-2 font-mono">{rs.name}</td>
+                          <td className="p-2">{rs.busy ? '✓' : '-'}</td>
+                          <td className="p-2">{rs.op || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* PC and Current Cycle - Small boxes on the right */}
+            <div className="col-span-1 flex flex-col gap-4 items-center justify-start">
+              <div className="bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-800 flex flex-col items-center justify-center w-24 mt-2">
+                <div className="text-xs text-gray-400">Current Cycle</div>
+                <div className="text-2xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
+              </div>
+              <div className="bg-zinc-900 rounded-lg px-3 py-2 border border-zinc-800 flex flex-col items-center justify-center w-24">
+                <div className="text-xs text-gray-400">PC</div>
+                <div className="text-2xl font-bold text-blue-400">{Math.max(0, (cpu?.getPC() ?? 0) - 1)}</div>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          <div className="bg-zinc-800 rounded p-4">
-            <div className="text-sm text-gray-500">Branch Misprediction Rate</div>
-            <div className="text-2xl font-bold text-red-400">{cpu?.getBranchMispredictionRate().toFixed(2)}%</div>
+
+          {/* Memory Selection and Display - Uniform 5 places with changeable address above each */}
+          <div className="max-w-7xl mx-auto mt-6 bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+            <h2 className="text-xl font-semibold mb-4 text-gray-200">Memory</h2>
+            <div className="grid grid-cols-5 gap-4 mb-4">
+              {selectedMemAddrs.map((addr, idx) => (
+                <div key={idx} className="flex flex-col items-center">
+                  <input
+                    type="number"
+                    value={addr}
+                    onChange={e => handleMemAddrChange(idx, Number(e.target.value))}
+                    className="w-20 p-1 rounded bg-zinc-800 text-blue-400 text-center mb-1 border border-zinc-700"
+                    min={0}
+                  />
+                  <div className="text-xs text-gray-500">Addr</div>
+                  <div className="bg-zinc-800 rounded p-3 mt-2 w-full">
+                    <div className="text-xs text-gray-500 mb-1">Mem[{addr}]</div>
+                    <div className="font-mono text-sm text-blue-400">{(MemoryViewer[addr] ?? 0).toFixed(2)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Performance Metrics */}
+          <div className="max-w-7xl mx-auto mt-6 bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+            <h2 className="text-xl font-semibold mb-4 text-gray-200">Performance Metrics</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-zinc-800 rounded p-4">
+                <div className="text-sm text-gray-500">Total Cycles</div>
+                <div className="text-2xl font-bold text-blue-400">{CycleCounter.value - 1}</div>
+              </div>
+              <div className="bg-zinc-800 rounded p-4">
+                <div className="text-sm text-gray-500">Instructions Completed</div>
+                <div className="text-2xl font-bold text-green-400">{InstructionCounter.value}</div>
+              </div>
+              <div className="bg-zinc-800 rounded p-4">
+                <div className="text-sm text-gray-500">IPC</div>
+                <div className="text-2xl font-bold text-purple-400">
+                  {(InstructionCounter.value / Math.max(1, CycleCounter.value - 1)).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              <div className="bg-zinc-800 rounded p-4">
+                <div className="text-sm text-gray-500">Branch Misprediction Rate</div>
+                <div className="text-2xl font-bold text-red-400">{cpu?.getBranchMispredictionRate().toFixed(2)}%</div>
+              </div>
+            </div>
+          </div>
         </div>
       </NavBar>
     </>
